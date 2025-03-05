@@ -1,0 +1,13 @@
+{
+  "MODULE": 0.8,
+  "MU": 0.1,
+  "N_PLANETS": 3,
+  "SUN_LIMITS": [12, 30],
+  "P1_LIMITS": [39, 51],
+  "P2_LIMITS": [32, 44],
+  "R2_LIMITS": [81, 97],
+  "STEPS": [2, 2, 2, 2],
+  "MIN_RATIO_THRESHOLD": 50.0,
+  "MIN_FORWARD_THRESHOLD": 0.30,
+  "MIN_BACKWARD_THRESHOLD": 0.30
+}
