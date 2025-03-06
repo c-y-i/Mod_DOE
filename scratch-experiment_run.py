@@ -176,13 +176,14 @@ while 1:
         # Read present position
         dxl_present_position, dxl_comm_result, dxl_error = packetHandler.read2ByteTxRx(portHandler, DXL_ID, ADDR_MX_PRESENT_POSITION)
         dxl_present_speed, dxl_comm_result, dxl_error = packetHandler.read2ByteTxRx(portHandler, DXL_ID, ADDR_MX_PRESENT_SPEED)
+        dxl_present_load, dxl_comm_result, dxl_error = packetHandler.read2ByteTxRx(portHandler, DXL_ID, ADDR_MX_PRESENT_LOAD)
         if dxl_comm_result != COMM_SUCCESS:
             print("%s" % packetHandler.getTxRxResult(dxl_comm_result))
         elif dxl_error != 0:
             print("%s" % packetHandler.getRxPacketError(dxl_error))
 
         # print("[ID:%03d] GoalPos:%03d  PresPos:%03d" % (DXL_ID, dxl_goal_position[index], dxl_present_position))
-        print("[ID:%03d] PresPos:%03d  PresSpeed:%03d" % (DXL_ID, dxl_present_position, dxl_present_speed))
+        print("[ID:%03d] PresPos:%03d, PresSpeed:%03d, PresLoad:%03d" % (DXL_ID, dxl_present_position, dxl_present_speed, dxl_present_load))
 
         # if not abs(dxl_goal_position[index] - dxl_present_position) > DXL_MOVING_STATUS_THRESHOLD:
         if time.time() - start > 3:
