@@ -1,11 +1,8 @@
 """
     Analysis of a 3K Planetary Gearbox
-
-    TODO: 
-    - Implement epsilon in gearbox.py
-    - Support other parameters, from the 2/21 meeting, such as x_i, lubrication, materials...
-    - Convert and merge profile shift coefficient function code from Matlab
-    - Rework plot gearbox func (optional)
+    features added in this version:
+    - Gearbox class now accepts additional parameters for profile shift coefficients.
+    - GearAnalysis class now includes option to slice the 3D efficiency plot based on a target gear ratio.
 """
 
 import numpy as np
@@ -19,6 +16,7 @@ import os
 import json
 from gearbox import Gearbox
 
+# Load configuration from config.json
 config_path = os.path.join(os.path.dirname(__file__), "config.json")
 with open(config_path, "r") as f:
     config = json.load(f)
@@ -34,6 +32,11 @@ STEPS = tuple(config["STEPS"])
 MIN_RATIO_THRESHOLD = config["MIN_RATIO_THRESHOLD"]
 MIN_FORWARD_THRESHOLD = config["MIN_FORWARD_THRESHOLD"]
 MIN_BACKWARD_THRESHOLD = config["MIN_BACKWARD_THRESHOLD"]
+
+# slicing parameters:
+SLICE_GEAR_RATIO = True 
+TARGET_GEAR_RATIO = 100.0 
+RATIO_TOLERANCE = 10.0 
 
 DISPLAY_BEST_GEARBOX = False
 DISPLAY_ITERATIONS_PLOT = True
@@ -73,23 +76,29 @@ class GearAnalysis:
     def compute(self):
         for z_s in self.sun_options:
             for z_p1 in self.p1_options:
-                # Ring 1 is constrained by Sun and P1, by the following equation
+                # Using the assumed relationship: z_r1 = z_s + 2*z_p1
                 z_r1 = z_s + 2 * z_p1
                 for z_p2 in self.p2_options:
                     for z_r2 in self.r2_options:
                         self.iteration += 1
                         gear = Gearbox(z_s, z_p1, z_r1, z_p2, z_r2)
                         gr = gear.gear_ratio()
-                        overall_ratio = 1 / gr if gr != 0 else float('inf')
+                        if gr <= 0:
+                            continue
+                        overall_ratio = 1.0 / gr
                         try:
                             eff_fwd = gear.forward_efficiency()
                             eff_bwd = gear.backward_efficiency()
                         except NotImplementedError:
                             continue
+                        if eff_fwd < 0 or eff_bwd < 0:
+                            continue
+                        if eff_fwd > 2.0 or eff_bwd > 2.0:
+                            continue
+                        composite_score = overall_ratio * eff_fwd * eff_bwd
                         print(f"Iter #{self.iteration}: Sun:{z_s}, P1:{z_p1}, R1:{z_r1}, "
                               f"P2:{z_p2}, R2:{z_r2} => Gear Ratio: 1:{overall_ratio:.2f}, "
                               f"Fwd: {eff_fwd*100:.2f}%, Bwd: {eff_bwd*100:.2f}%")
-                        composite_score = overall_ratio * eff_fwd * eff_bwd
                         candidate = (self.iteration, z_s, z_p1, z_r1, z_p2, z_r2,
                                      overall_ratio, eff_fwd, eff_bwd, composite_score)
                         self.iterations_data.append(candidate)
@@ -147,13 +156,12 @@ def create_gear(z_teeth, pitch_radius, depth_frac, color):
     return Polygon(points, closed=True, fill=False, edgecolor=color, linewidth=1)
 
 def plot_gearbox(candidate):
-    # candidate format:
-    # (iteration, z_s, z_p1, z_r1, z_p2, z_r2, overall_ratio, eff_fwd, eff_bwd, composite_score)
+    # candidate: (iteration, z_s, z_p1, z_r1, z_p2, z_r2, overall_ratio, eff_fwd, eff_bwd, composite_score)
     _, z_s, z_p1, z_r1, z_p2, z_r2, overall_ratio, eff_fwd, eff_bwd, _ = candidate
     r_sun = 0.5 * MODULE * z_s
     r_p1 = 0.5 * MODULE * z_p1
-    r_r1 = r_sun + 2 * r_p1
-    
+    r_r1 = r_sun + 2 * r_p1  # based on your geometry
+
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.set_aspect('equal')
     sun = create_gear(z_s, r_sun, 0.15, '#FFD700')
@@ -196,31 +204,83 @@ def plot_gearbox(candidate):
     
     plt.show()
 
-def plot_efficiencies(data, total_iterations):
+def plot_efficiencies(data, total_iterations, slice_flag=False, target_ratio=None, tolerance=0):
+    """
+    Creates a 3D scatter plot of overall gear ratio (x), forward efficiency (y), 
+    and backward efficiency (z). If slice_flag is True and target_ratio is given,
+    the function will plot candidates whose gear ratio falls within the range:
+       [target_ratio*(1 - tolerance/100), target_ratio*(1 + tolerance/100)]
+    with full opacity (and annotation box colored light green) while other points
+    are plotted with low opacity (and annotation box colored light red).
+    Only the most recent annotation is displayed.
+    """
     import warnings
     warnings.filterwarnings("ignore", message="3d coordinates not supported yet", category=UserWarning)
-    filtered = [d for d in data if d[7] > 0 and d[8] > 0] 
-    gear_ratios = [d[6] for d in filtered]  # overall_ratio
-    fwd_eff = [d[7]*100 for d in filtered]  # forward efficiency (%)
-    bwd_eff = [d[8]*100 for d in filtered]  # backward efficiency (%)
-    labels = []
+    
+    filtered = [d for d in data if d[7] > 0 and d[8] > 0]
+    if not filtered:
+        print("No valid data to plot (all filtered).")
+        return
+
+    if slice_flag and target_ratio is not None:
+        if tolerance == 0:
+            lower_bound = target_ratio
+            upper_bound = target_ratio
+        else:
+            lower_bound = target_ratio * (1 - tolerance / 100.0)
+            upper_bound = target_ratio * (1 + tolerance / 100.0)
+    else:
+        lower_bound = None
+        upper_bound = None
+
+    data_in = []
+    data_out = []
+    labels_in = []
+    labels_out = []
+    gear_ratios_in = []
+    gear_ratios_out = []
+    fwd_eff_in = []
+    fwd_eff_out = []
+    bwd_eff_in = []
+    bwd_eff_out = []
+
     for d in filtered:
-        # d = (iteration, z_s, z_p1, z_r1, z_p2, z_r2, overall_ratio, eff_fwd, eff_bwd, composite_score)
         itr, z_s, z_p1, z_r1, z_p2, z_r2, overall_ratio, eff_fwd, eff_bwd, _ = d
         label = (f"Iteration: {itr}\n"
                  f"Sun: {z_s}, P1: {z_p1}, R1: {z_r1}\n"
                  f"P2: {z_p2}, R2: {z_r2}\n"
                  f"Gear Ratio: 1:{overall_ratio:.2f}\n"
                  f"Fwd: {eff_fwd*100:.2f}%, Bwd: {eff_bwd*100:.2f}%")
-        labels.append(label)
+        if lower_bound is not None and (overall_ratio < lower_bound or overall_ratio > upper_bound):
+            data_out.append(d)
+            gear_ratios_out.append(overall_ratio)
+            fwd_eff_out.append(eff_fwd * 100)
+            bwd_eff_out.append(eff_bwd * 100)
+            labels_out.append(label)
+        else:
+            data_in.append(d)
+            gear_ratios_in.append(overall_ratio)
+            fwd_eff_in.append(eff_fwd * 100)
+            bwd_eff_in.append(eff_bwd * 100)
+            labels_in.append(label)
     
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    sc = ax.scatter(gear_ratios, fwd_eff, bwd_eff, c=fwd_eff, cmap='viridis', edgecolor='k')
+    
+    sc_in = None
+    if gear_ratios_in:
+        sc_in = ax.scatter(gear_ratios_in, fwd_eff_in, bwd_eff_in, 
+                         c=fwd_eff_in, cmap='viridis', edgecolor='k', alpha=1, s=50)
+    sc_out = None
+    if gear_ratios_out:
+        sc_out = ax.scatter(gear_ratios_out, fwd_eff_out, bwd_eff_out, 
+                         c=fwd_eff_out, cmap='viridis', edgecolor='k', alpha=0.1, s=30)
+    
     ax.set_xlabel("Gear Ratio (1:ratio)")
     ax.set_ylabel("Forward Efficiency (%)")
     ax.set_zlabel("Backward Efficiency (%)")
     ax.set_title("Wolfrom Analysis")
+    
     global_text = (
         f"Total Iterations: {total_iterations}\n"
         f"Friction Coefficient: {MU}\n"
@@ -228,40 +288,39 @@ def plot_efficiencies(data, total_iterations):
         f"Planet1: [{P1_LIMITS[0]}, {P1_LIMITS[1]}]\n"
         f"Planet2: [{P2_LIMITS[0]}, {P2_LIMITS[1]}]\n"
         f"Ring2: [{R2_LIMITS[0]}, {R2_LIMITS[1]}]\n"
-        f"Step Sizes: {STEPS}"
+        f"Step Sizes: {STEPS}\n"
     )
     anchored_text = AnchoredText(
-        global_text,
-        loc='upper left',
+        global_text, loc='upper left',
         bbox_to_anchor=(0, 1),
         bbox_transform=plt.gcf().transFigure,
         prop=dict(size=10),
         frameon=True
     )
     ax.add_artist(anchored_text)
-    import matplotlib as mpl
-    norm = mpl.colors.Normalize(vmin=min(fwd_eff), vmax=max(fwd_eff))
-    cmap = plt.get_cmap('viridis')
-    cursor = mplcursors.cursor(sc, hover=True)
+    cursor = mplcursors.cursor([sc_in, sc_out] if (sc_in is not None and sc_out is not None)
+                               else (sc_in if sc_in is not None else sc_out),
+                               hover=True, multiple=False)
+    
     def on_add(sel):
-        sel.annotation.arrow_patch.set_visible(False)
-        sel.annotation.set_text(labels[sel.index])
-        point_val = fwd_eff[sel.index]
-        color = cmap(norm(point_val))
-        sel.annotation.get_bbox_patch().set_facecolor(color)
+        sel.annotation.set_visible(True)
+        if sel.artist == sc_in:
+            sel.annotation.get_bbox_patch().set_facecolor("lightgreen")
+            sel.annotation.set_text(labels_in[sel.index])
+        else:
+            sel.annotation.get_bbox_patch().set_facecolor("lightcoral")
+            sel.annotation.set_text(labels_out[sel.index])
     cursor.connect("add", on_add)
     
-    fig.colorbar(sc, label="Forward Efficiency (%)")
+    fig.colorbar(sc_in if sc_in is not None else sc_out, label="Forward Efficiency (%)")
     plt.show()
 
 def compute_gearbox():
     """
-    compute the 3K Planetary Gearbox by iterating over design options.
-    Option selection is now integrated with generated options.
-    Limits and step sizes for each gear are provided to generate_all_options.
+    Compute the 3K Planetary Gearbox by iterating over design options,
+    then report metrics and plot results. The slice feature is applied to the
+    3D efficiency plot if enabled.
     """
-    # limits and steps for each gear type.
-    # order: sun, p1, p2, r2, steps
     start_time = time.time()
     options = generate_all_options(SUN_LIMITS, P1_LIMITS, P2_LIMITS, R2_LIMITS, STEPS)
     sun_options = options["sun"]
@@ -269,51 +328,50 @@ def compute_gearbox():
     p2_options  = options["p2"]
     r2_options  = options["r2"]
     
-    gear_analysis = GearAnalysis(sun_options, p1_options, p2_options, r2_options) 
+    gear_analysis = GearAnalysis(sun_options, p1_options, p2_options, r2_options)
     gear_analysis.compute()
     print("\nParameters:")
     print(f"Module: {MODULE}, Friction Coefficient: {MU}, Number of Planets: {N_PLANETS}")
     gear_analysis.report()
+    
     best_candidate = gear_analysis.best_composite_meet[0][1]
     if best_candidate is None:
         print("No candidate satisfies the thresholds. Skipping plotting.")
     else:
-        if DISPLAY_BEST_GEARBOX: # if flag is True...
+        if DISPLAY_BEST_GEARBOX:
             print("\nPlotting best overall candidate...")
             plot_gearbox(best_candidate)
-    # ONLY plot if best candidate is found and flag is True.
-    if DISPLAY_ITERATIONS_PLOT and best_candidate is not None and gear_analysis.iterations_data:
+    
+    if DISPLAY_ITERATIONS_PLOT and gear_analysis.iterations_data:
         end_time = time.time() 
         total_time = end_time - start_time
         print(f"Total computation time: {total_time:.2f} seconds")
         print("\nPlotting efficiency results...")
-        plot_efficiencies(gear_analysis.iterations_data, gear_analysis.iteration)  # pass total iterations
-
+        plot_efficiencies(
+            gear_analysis.iterations_data,
+            gear_analysis.iteration,
+            slice_flag=SLICE_GEAR_RATIO,
+            target_ratio=TARGET_GEAR_RATIO,
+            tolerance=RATIO_TOLERANCE
+        )
 
 def generate_options(lower: int, upper: int, step: int = 1):
-    # Helper function
     return list(range(lower, upper + 1, step))
 
 def generate_all_options(sun_limits: tuple, p1_limits: tuple, p2_limits: tuple, r2_limits: tuple, 
                          steps: tuple = (1,1,1,1)):
     """
-    Parameters:
-    - sun_limits: (lower, upper) limits for the sun gear teeth count.
-    - p1_limits: (lower, upper) limits for the planet gear 1 teeth count.
-    - p2_limits: (lower, upper) limits for the planet gear 2 teeth count.
-    - r2_limits: (lower, upper) limits for the ring gear 2 teeth count.
-    - steps: Tuple of steps (step_sun, step_p1, step_p2, step_r2). Default is (1,1,1,1).
+    Generate design options for each gear type.
+    Returns a dictionary with keys: "sun", "p1", "p2", "r2".
     """
     step_sun, step_p1, step_p2, step_r2 = steps
-    options = {
+    return {
         "sun": generate_options(sun_limits[0], sun_limits[1], step_sun),
         "p1": generate_options(p1_limits[0], p1_limits[1], step_p1),
         "p2": generate_options(p2_limits[0], p2_limits[1], step_p2),
         "r2": generate_options(r2_limits[0], r2_limits[1], step_r2)
     }
-    return options
-
 
 if __name__ == "__main__":
-    print(f"Starting computation based on defined parameters...\n")
+    print("Starting computation based on defined parameters...\n")
     compute_gearbox()
