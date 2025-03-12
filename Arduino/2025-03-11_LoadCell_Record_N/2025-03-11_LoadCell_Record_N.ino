@@ -8,7 +8,7 @@ HX711 scale;
 
 const uint8_t LOADCELL_DOUT_PIN = 22;
 const uint8_t LOADCELL_SCK_PIN = 21;
-int init_time = 0;
+long init_time = 0;
 
 // const float calibration_factor = 48450; //7050 or 48450 in the past -GMC
 // const float calibration_factor = 9222.8; //104
@@ -31,13 +31,13 @@ void setup() {
 
 void loop() {
   //start timer
-  int start_time = millis();
+  long start_time = millis();
 
   // Read scale
   float This_Reading = scale.get_units(); //N (??)
 
   // Print values
-  int this_time = millis() - init_time;
+  long this_time = millis() - init_time;
   Serial.print(this_time); // ms
   Serial.print(", ");
   Serial.print(This_Reading); // lbs
