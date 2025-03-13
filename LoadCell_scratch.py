@@ -38,10 +38,11 @@ esp_serial = '/dev/ttyUSB0'
 esp_baud = 115200
 
 # Dictionary details
-dict_file = '3_12_force_dict.pkl'
+dict_file = '3_xx_force_dict.pkl'
 in_mass = 2.35 #kg
 # in_mass = 1.25 #kg
-in_material = 'PLA_NonLubricated'
+# in_mass = 0.29 #kg
+in_material = 'PLA_PTFE'
 
 #################################################
 # Main Loop
@@ -83,8 +84,13 @@ while not a_list:
 key_name = str(in_mass) + 'kg_' + str(in_material)
 
 os.chdir('Mod_DOE')
-# dict_set = {}
-dict_set = pickle.load(open(dict_file, "rb"))
+# check if dict_file exists
+if not os.path.exists(dict_file):
+    print("Creating new dictionary")
+    dict_set = {}
+else:
+    dict_set = pickle.load(open(dict_file, "rb"))
+
 # see if key exists
 if key_name in dict_set.keys():
     print("Key exists, appending")
