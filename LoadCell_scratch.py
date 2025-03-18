@@ -38,11 +38,11 @@ esp_serial = '/dev/ttyUSB0'
 esp_baud = 115200
 
 # Dictionary details
-dict_file = '3_xx_force_dict.pkl'
+dict_file = '3_18_force_dict.pkl'
 in_mass = 2.35 #kg
 # in_mass = 1.25 #kg
 # in_mass = 0.29 #kg
-in_material = 'PLA_PTFE'
+in_material = 'PLA_Si_Grease_Thin'
 
 #################################################
 # Main Loop
