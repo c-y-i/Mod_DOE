@@ -56,7 +56,8 @@ class Gearbox:
         # Working pressure angles (modified formula)
         alpha_wa = np.arccos(self.ma * (self.z_s + self.z_p1) * np.cos(self.alpha) / (2 * ra))
         alpha_wb = np.arccos(self.ma * (-self.z_p1 + self.z_r1) * np.cos(self.alpha) / (2 * ra))
-        alpha_wc = np.arccos(self.mc * (-self.z_p2 + self.z_r2) * np.cos(self.alpha) / (2 * ra))
+        val = self.mc * (-self.z_p2 + self.z_r2) * np.cos(self.alpha) / (2 * ra)
+        alpha_wc = np.arccos(np.clip(val, -1, 1))
         # Center distance modification coefficient
         ya = ((self.z_s + self.z_p1) / 2.0) * ((np.cos(self.alpha) / np.cos(alpha_wa)) - 1)
         # Tip circle diameters
@@ -71,7 +72,8 @@ class Gearbox:
         alpha_ab1 = np.arccos(db_b1 / dap1)
         alpha_ab2 = np.arccos(db_b2 / dar1)
         alpha_ac1 = np.arccos(db_c1 / dap2)
-        alpha_ac2 = np.arccos(db_c2 / dar2)
+        val2 = db_c2 / dar2
+        alpha_ac2 = np.arccos(np.clip(val2, -1, 1))
         # Approach and recess contact ratios
         ea1 = (self.z_p1 / (2 * np.pi)) * (np.tan(alpha_aa2) - np.tan(alpha_wa))
         ea2 = (self.z_s / (2 * np.pi)) * (np.tan(alpha_aa1) - np.tan(alpha_wa))
