@@ -23,6 +23,9 @@ with open(config_path, "r") as f:
 
 MODULE = config["MODULE"]
 MU = config["MU"]
+MC = config.get("MC", MODULE)
+ALPHA = np.radians(config.get("ALPHA", 20))
+XR1 = config.get("XR1", 0.0)
 N_PLANETS = config["N_PLANETS"]
 SUN_LIMITS = tuple(config["SUN_LIMITS"])
 P1_LIMITS  = tuple(config["P1_LIMITS"])
@@ -39,7 +42,7 @@ RATIO_TOLERANCE = 10
 DISPLAY_BEST_GEARBOX = False
 DISPLAY_ITERATIONS_PLOT = True
 RUN_SAMPLE_TRIAL = False
-MAX_CANDIDATES = 50
+MAX_CANDIDATES = 400
 
 def generate_range_options(range_vals):
     low, high, step = range_vals
@@ -82,8 +85,8 @@ class GearAnalysis:
         self.best_ratio_meet = []
         self.best_composite_meet = []
         self.iterations_data = []  
-
-    def compute(self):
+    
+    def old_compute(self):
         total_iterations = (len(self.sun_options) * len(self.p1_options) * len(self.p2_options) *
                             len(self.r2_options) * len(self.xs_options) * len(self.xp1_options) *
                             len(self.xp2_options) * len(self.xr2_options))
@@ -136,125 +139,148 @@ class GearAnalysis:
                                                 self.best_composite_meet = update_tracker_list(self.best_composite_meet, composite_score, candidate)
                                             pbar.update(1)
 
-    def print_metric(self, metric_name, tracker, threshold):
-        if not tracker:
-            print(f"\nNo combination meets {metric_name} threshold of {threshold}.")
-        else:
-            best_value, best_candidate = tracker[0]
-            print(f"{metric_name} (req satisfied, top candidate of {len(tracker)} kept): Iteration: {best_candidate[0]} | Sun:{best_candidate[1]} (xs:{best_candidate[10]}), "
-                  f"P1:{best_candidate[2]} (xp1:{best_candidate[11]}), R1:{best_candidate[3]}, "
-                  f"P2:{best_candidate[4]} (xp2:{best_candidate[12]}), R2:{best_candidate[5]} (xr2:{best_candidate[13]}) => "
-                  f"Gear Ratio: 1:{best_candidate[6]:.2f}, Fwd: {best_candidate[7]*100:.2f}%, "
-                  f"Bwd: {best_candidate[8]*100:.2f}%, Composite: {best_candidate[9]:.2e}")
+    def compute(self):
+        sun_options = np.array(self.sun_options)
+        p1_options = np.array(self.p1_options)
+        p2_options = np.array(self.p2_options)
+        r2_options = np.array(self.r2_options)
+        xs_options = np.array(self.xs_options)
+        xp1_options = np.array(self.xp1_options)
+        xp2_options = np.array(self.xp2_options)
+        xr2_options = np.array(self.xr2_options)
 
-    def report(self):
-        print("\nBest Forward Efficiency:")
-        self.print_metric("Forward Efficiency", self.best_forward_meet, self.min_forward_threshold)
-        print("\nBest Backward Efficiency:")
-        self.print_metric("Backward Efficiency", self.best_backward_meet, self.min_backward_threshold)
-        print("\nBest Gear Ratio:")
-        self.print_metric("Gear Ratio", self.best_ratio_meet, self.min_ratio_threshold)
-        print("\nBest Overall Combination (Composite Score):")
-        self.print_metric("Composite Score", self.best_composite_meet, "N/A")
+        z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2 = np.meshgrid(
+            sun_options, p1_options, p2_options, r2_options, xs_options, xp1_options, xp2_options, xr2_options, indexing='ij'
+        )
 
-def plot_efficiencies(data, total_iterations, slice_flag=False, target_ratio=TARGET_GEAR_RATIO, tolerance=RATIO_TOLERANCE):
-    """
-    Creates a 3D scatter plot showing only candidates that meet the target gear ratio requirement
-    within the specified tolerance. Points are colored by their forward efficiency.
-    """
-    import warnings
-    warnings.filterwarnings("ignore", message="3d coordinates not supported yet", category=UserWarning)
-    
-    lower_bound = target_ratio * (1 - tolerance / 100.0)
-    upper_bound = target_ratio * (1 + tolerance / 100.0)
-    
-    filtered = [d for d in data if d[7] > 0 and d[8] > 0 
-                and d[6] >= lower_bound and d[6] <= upper_bound]
-    
-    if not filtered:
-        print("No candidates meet the target gear ratio requirement.")
-        return
+        total_combinations = z_s.size
+        self.iteration = 0
 
-    gear_ratios = []
-    fwd_eff = []
-    bwd_eff = []
-    labels = []
-    
-    for d in filtered:
-        itr, z_s, z_p1, z_r1, z_p2, z_r2, overall_ratio, eff_fwd, eff_bwd, _, xs, xp1, xp2, xr2 = d
-        gear_ratios.append(overall_ratio)
-        fwd_eff.append(eff_fwd * 100)
-        bwd_eff.append(eff_bwd * 100)
+        # flatten everything
+        z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2 = z_s.flatten(), z_p1.flatten(), z_p2.flatten(), z_r2.flatten(), xs.flatten(), xp1.flatten(), xp2.flatten(), xr2.flatten()
+
+        z_r1 = z_s + 2 * z_p1
+
+        I1 = z_r1 / z_s
+        I2 = (z_r1 * z_p2) / (z_p1 * z_r2)
+        gr_s = (1 - I2) / (1 + I1)
+        ratios = 1 / gr_s
+        # I1, I2, gr_s, ratios = I1.flatten(), I2.flatten(), gr_s.flatten(), ratios.flatten()
+
+
+        # plot gr_s and ratios (subsampled) in 2 subplots
+        subsample = 1000
+        plot_grs = gr_s[::subsample]
+        plot_ratios = ratios[::subsample]
+        fig, axs = plt.subplots(figsize=(12, 6))
+        len_plot = len(plot_grs)
+        axs.scatter(plot_grs, plot_ratios)
+        plt.show()
+
+        # only keep valid combinations (ratios w.in tolerance)
+        valid_combinations = np.logical_and(gr_s > 0, np.abs(TARGET_GEAR_RATIO - ratios) <= RATIO_TOLERANCE)
         
-        label = (f"Iteration: {itr}\n"
-                f"Sun: {z_s} (xs:{xs})\n"
-                f"P1: {z_p1} (xp1:{xp1}), R1: {z_r1}\n"
-                f"P2: {z_p2} (xp2:{xp2}), R2: {z_r2} (xr2:{xr2})\n"
-                f"Gear Ratio: 1:{overall_ratio:.2f}\n"
-                f"Fwd: {eff_fwd*100:.2f}%, Bwd: {eff_bwd*100:.2f}%")
-        labels.append(label)
-    
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    
-    sc = ax.scatter(gear_ratios, fwd_eff, bwd_eff, c=fwd_eff, cmap='viridis', edgecolor='k', alpha=1, s=50)
-    
-    ax.set_xlabel("Gear Ratio (1:ratio)")
-    ax.set_ylabel("Forward Efficiency (%)")
-    ax.set_zlabel("Backward Efficiency (%)")
-    ax.set_title(f"Target Ratio: {target_ratio}±{tolerance}%")
-    
-    global_text = (
-        f"Total Iterations: {total_iterations}\n"
-        f"Target Gear Ratio: {target_ratio}±{tolerance}%\n"
-        f"Friction Coefficient: {MU}\n"
-        f"Sun: [{SUN_LIMITS[0]}, {SUN_LIMITS[1]}]\n"
-        f"Planet1: [{P1_LIMITS[0]}, {P1_LIMITS[1]}]\n"
-        f"Planet2: [{P2_LIMITS[0]}, {P2_LIMITS[1]}]\n"
-        f"Ring2: [{R2_LIMITS[0]}, {R2_LIMITS[1]}]\n"
-        f"Step Sizes: {STEPS}\n"
-    )
-    anchored_text = AnchoredText(
-        global_text, loc='upper left',
-        bbox_to_anchor=(0, 1),
-        bbox_transform=plt.gcf().transFigure,
-        prop=dict(size=10),
-        frameon=True
-    )
-    ax.add_artist(anchored_text)
-    
-    cursor = mplcursors.cursor(sc, hover=True)
-    def on_add(sel):
-        sel.annotation.set_visible(True)
-        sel.annotation.get_bbox_patch().set_facecolor("lightgreen")
-        sel.annotation.set_text(labels[sel.index])
-    cursor.connect("add", on_add)
-    
-    fig.colorbar(sc, label="Forward Efficiency (%)")
-    plt.show()
+        z_r1 = z_r1[valid_combinations]
+        z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2 = z_s[valid_combinations], z_p1[valid_combinations], z_p2[valid_combinations], z_r2[valid_combinations], xs[valid_combinations], xp1[valid_combinations], xp2[valid_combinations], xr2[valid_combinations]
+        I1, I2, gr_s, ratios = I1[valid_combinations], I2[valid_combinations], gr_s[valid_combinations], ratios[valid_combinations]
 
-def measure_sample_avg_time(iter_count, sun_options, p1_options, p2_options, r2_options,
-                            xs_options, xp1_options, xp2_options, xr2_options):
-    import time
-    sample_sun = sun_options[0]
-    sample_p1 = p1_options[0]
-    sample_p2 = p2_options[0]
-    sample_r2 = r2_options[0]
-    sample_xs = xs_options[0]
-    sample_xp1 = xp1_options[0]
-    sample_xp2 = xp2_options[0]
-    sample_xr2 = xr2_options[0]
-    sample_r1 = sample_sun + 2 * sample_p1
-    start_sample = time.time()
-    for i in range(iter_count):
-        gear = Gearbox(sample_sun, sample_p1, sample_r1, sample_p2, sample_r2,
-                       xs=sample_xs, xp1=sample_xp1, xp2=sample_xp2,
-                       xr1=config["XR1"], xr2=sample_xr2)
-        _ = gear.forward_efficiency()
-        _ = gear.backward_efficiency()
-    end_sample = time.time()
-    return (end_sample - start_sample) / iter_count
+        assert z_s.shape == z_p1.shape == z_r1.shape == z_p2.shape == z_r2.shape == xs.shape == xp1.shape == xp2.shape == xr2.shape == ratios.shape
 
+        print(f'Of {total_combinations} total inputs, there are {len(z_s)} valid combinations')
+
+        ra = (z_s * MODULE + z_p1 * MODULE) / 2.0
+
+        # Basic circle diameters
+        db_a1 = MODULE * z_s * np.cos(ALPHA)
+        db_a2 = MODULE * z_p1 * np.cos(ALPHA)
+        db_b1 = MODULE * z_p1 * np.cos(ALPHA)
+        db_b2 = MODULE * z_r1 * np.cos(ALPHA)
+        db_c1 = MC * z_p2 * np.cos(ALPHA)
+        db_c2 = MC * z_r2 * np.cos(ALPHA)
+
+        # Working pressure angles (modified formula)
+        alpha_wa = np.arccos(MODULE * (z_s + z_p1) * np.cos(ALPHA) / (2 * ra))
+        alpha_wb = np.arccos(MODULE * (-z_p1 + z_r1) * np.cos(ALPHA) / (2 * ra))
+        val = MC * (-z_p2 + z_r2) * np.cos(ALPHA) / (2 * ra)
+        alpha_wc = np.arccos(np.clip(val, -1, 1))
+        # Center distance modification coefficient
+        ya = ((z_s + z_p1) / 2.0) * ((np.cos(ALPHA) / np.cos(alpha_wa)) - 1)
+        # Tip circle diameters
+        das  = MODULE * z_s + 2 * MODULE * (1 + ya - xp1)
+        dap1 = MODULE * z_p1 + 2 * MODULE * (1 + np.minimum(ya - xs, xp1))
+        dar1 = MODULE * z_r1 - 2 * MODULE * (1 - XR1)
+        dap2 = MC * z_p2 + 2 * MC * (1 + xp2)
+        dar2 = MC * z_r2 - 2 * MC * (1 - xr2)
+        # Tip pressure angles
+        alpha_aa1 = np.arccos(db_a1 / das)
+        alpha_aa2 = np.arccos(db_a2 / dap1)
+        alpha_ab1 = np.arccos(db_b1 / dap1)
+        alpha_ab2 = np.arccos(db_b2 / dar1)
+        alpha_ac1 = np.arccos(db_c1 / dap2)
+        val2 = db_c2 / dar2
+        alpha_ac2 = np.arccos(np.clip(val2, -1, 1))
+        # Approach and recess contact ratios
+        ea1 = (z_p1 / (2 * np.pi)) * (np.tan(alpha_aa2) - np.tan(alpha_wa))
+        ea2 = (z_s / (2 * np.pi)) * (np.tan(alpha_aa1) - np.tan(alpha_wa))
+        eb1 = -(z_r1 / (2 * np.pi)) * (np.tan(alpha_ab2) - np.tan(alpha_wb))
+        eb2 = (z_p1 / (2 * np.pi)) * (np.tan(alpha_ab1) - np.tan(alpha_wb))
+        ec1 = -(z_r2 / (2 * np.pi)) * (np.tan(alpha_ac2) - np.tan(alpha_wc))
+        ec2 = (z_p2 / (2 * np.pi)) * (np.tan(alpha_ac1) - np.tan(alpha_wc))
+        ea = ea1**2 + ea2**2 - ea1 - ea2 + 1
+        eb = eb1**2 + eb2**2 - eb1 - eb2 + 1
+        ec = ec1**2 + ec2**2 - ec1 - ec2 + 1
+        # Basic driving efficiencies
+        Ea_val = 1 - MU* np.pi * (1 / z_s + 1 / z_p1) * ea
+        Eb_val = 1 - MU* np.pi * (1 / z_p1 - 1 / z_r1) * eb
+        Ec_val = 1 - MU* np.pi * (1 / z_p2 - 1 / z_r2) * ec
+        # Forward driving efficiency 
+        eta_fwd = (1 + Ea_val * Eb_val * I1) * (1 - I2) / ((1 + I1) * (1 - Eb_val * Ec_val * I2))
+        # Backward driving efficiency
+        eta_bwd = (1 + I1) * Ea_val * (Eb_val * Ec_val - I2) / (Ec_val * (Ea_val * Eb_val + I1) * (1 - I2))
+
+        # Average and std for eta
+        avg_fwd = np.mean(eta_fwd)
+        std_fwd = np.std(eta_fwd)
+        avg_bwd = np.mean(eta_bwd)
+        std_bwd = np.std(eta_bwd)
+        print(f'Efficiency shapes: {eta_fwd.shape}, {eta_bwd.shape}')
+        print(f"Average Forward Efficiency: {avg_fwd:.4f} +/- {std_fwd:.4f}")
+        print(f"Average Backward Efficiency: {avg_bwd:.4f} +/- {std_bwd:.4f}")
+
+        composite_score = ratios * eta_fwd * eta_bwd
+
+        # create a list of the n (Max_Candidates) best scores
+        # sort all vectors by composite score
+        sorted_indices = np.argsort(composite_score)[::-1]
+        best_indices = sorted_indices[:MAX_CANDIDATES]
+        
+        # make 'best' versions of all the arrays
+        best_z_s = z_s[best_indices]
+        best_z_p1 = z_p1[best_indices]
+        best_z_r1 = z_r1[best_indices]
+        best_z_p2 = z_p2[best_indices]
+        best_z_r2 = z_r2[best_indices]
+        best_xs = xs[best_indices]
+        best_xp1 = xp1[best_indices]
+        best_xp2 = xp2[best_indices]
+        best_xr2 = xr2[best_indices]
+        best_ratios = ratios[best_indices]
+        best_eta_fwd = eta_fwd[best_indices]
+        best_eta_bwd = eta_bwd[best_indices]
+        best_composite_score = composite_score[best_indices]
+        
+
+        # plot: Gear ratio, forward efficiency, backward efficiency (color forward efficiency)
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        sc = ax.scatter(best_ratios, best_eta_fwd, c=best_eta_bwd, cmap='viridis', edgecolor='k', alpha=1, s=50)
+        ax.set_xlabel("Gear Ratio (1:ratio)")
+        ax.set_ylabel("Forward Efficiency (%)")
+        ax.set_title("Gear Ratio vs. Forward Efficiency")
+        fig.colorbar(sc, label="Forward Efficiency (%)")
+        plt.show()
+
+  
 def compute_gearbox():
     """
     Compute the 3K Planetary Gearbox by iterating over design options,
@@ -289,44 +315,6 @@ def compute_gearbox():
     gear_analysis = GearAnalysis(sun_options, p1_options, p2_options, r2_options,
                                  xs_options, xp1_options, xp2_options, xr2_options)
     gear_analysis.compute()
-    print("\nParameters:")
-    print(f"Module: {MODULE}, Friction Coefficient: {MU}, Number of Planets: {N_PLANETS}")
-    gear_analysis.report()
-    
-    best_candidate = gear_analysis.best_composite_meet[0][1] if gear_analysis.best_composite_meet else None
-    if best_candidate is None:
-        print("No candidate satisfies the thresholds. Skipping plotting.")
-    else:
-        pass
-
-    if DISPLAY_ITERATIONS_PLOT:
-        end_time = time.time() 
-        total_time = end_time - start_time
-        print(f"Total computation time: {total_time:.2f} seconds")
-        
-        if gear_analysis.best_forward_meet:
-            print("\nPlotting efficiency results for best forward candidates...")
-            plot_efficiencies(
-                [pair[1] for pair in gear_analysis.best_forward_meet],
-                gear_analysis.iteration,
-                slice_flag=SLICE_GEAR_RATIO,
-                target_ratio=TARGET_GEAR_RATIO,
-                tolerance=RATIO_TOLERANCE
-            )
-        else:
-            print("No best forward candidates to plot.")
-            
-        if gear_analysis.best_backward_meet:
-            print("\nPlotting efficiency results for best backward candidates...")
-            plot_efficiencies(
-                [pair[1] for pair in gear_analysis.best_backward_meet],
-                gear_analysis.iteration,
-                slice_flag=SLICE_GEAR_RATIO,
-                target_ratio=TARGET_GEAR_RATIO,
-                tolerance=RATIO_TOLERANCE
-            )
-        else:
-            print("No best backward candidates to plot.")
 
 def generate_options(lower: int, upper: int, step: int = 1):
     return list(range(lower, upper + 1, step))
