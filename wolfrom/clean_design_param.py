@@ -16,31 +16,10 @@ import csv
 from tqdm import tqdm
 
 # %%
-config = {
-  "MODULE": 0.8e-3,
-  "MC": 0.8467e-3,
-  "MU": 0.21,
-  "ALPHA": 20,
-  "XS": 0.476,
-  "XP1": 0.762,
-  "XP2": 0.536,
-  "XR1": 2,
-  "XR2": 1.21,
-  "XS_RANGE": [-0.5, 0.5, 0.25],
-  "XP1_RANGE": [-1, 1, 0.25],
-  "XP2_RANGE": [-0.5, 0.5, 0.25],
-  "XR2_RANGE": [-1.5, 1.5, 0.25],
-  "N_PLANETS": 3,
-  "SUN_LIMITS": [4, 30],
-  "P1_LIMITS": [20, 42],
-  "P2_LIMITS": [20, 40],
-  "R2_LIMITS": [60, 90],
-  "STEPS": [2, 1, 1, 1],
-  "MIN_RATIO_THRESHOLD": 90,
-  "MIN_FORWARD_THRESHOLD": 0.30,
-  "MIN_BACKWARD_THRESHOLD": 0.30
-}
-
+# load config
+config_path = os.path.join(os.path.dirname(__file__), "config.json")
+with open(config_path, "r") as f:
+    config = json.load(f)
 
 # %%
 MODULE = config["MODULE"]
@@ -64,9 +43,9 @@ RATIO_TOLERANCE = 10
 DISPLAY_BEST_GEARBOX = False
 DISPLAY_ITERATIONS_PLOT = True
 RUN_SAMPLE_TRIAL = False
-MAX_CANDIDATES = 1000
+MAX_CANDIDATES = 5000
 
-# Number of top combinations to display
+# Number of top combinations to display in terminal
 TOP_COMBINATIONS = 100
 
 # %%
