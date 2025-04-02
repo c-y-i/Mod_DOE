@@ -43,7 +43,7 @@ RATIO_TOLERANCE = 10
 DISPLAY_BEST_GEARBOX = False
 DISPLAY_ITERATIONS_PLOT = True
 RUN_SAMPLE_TRIAL = False
-MAX_CANDIDATES = 5000
+MAX_CANDIDATES = 20000
 tol = 0.1 # let's start with 0.1, the allowable tolerance in table III is 0.09 as a reference.
 
 # Number of top combinations to display in terminal
