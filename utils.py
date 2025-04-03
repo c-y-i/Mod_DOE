@@ -180,7 +180,7 @@ def efficiency_calc(z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, I1, I2, gr_s, rati
 
 '''
 Function 'score vals'
-takes:  in_vals (parameters to sweep) [7,n] - [z_s, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
+takes:  in_vals (parameters to sweep) [7,1] list of  - [z_s, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
         target_z_r1 - target gears for ring 1 ()
         add_gear - boolean whether to also add in the values from Matsuki 2019 paper
 gives: score [scalar] - number of valid combinations
