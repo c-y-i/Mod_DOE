@@ -43,7 +43,7 @@ RATIO_TOLERANCE = 10
 DISPLAY_BEST_GEARBOX = False
 DISPLAY_ITERATIONS_PLOT = True
 RUN_SAMPLE_TRIAL = False
-MAX_CANDIDATES = 20000
+MAX_CANDIDATES = 50000
 tol = 0.1 # let's start with 0.1, the allowable tolerance in table III is 0.09 as a reference.
 
 # Number of top combinations to display in terminal
@@ -288,27 +288,27 @@ ax.set_title("Gear Ratio vs. Forward Efficiency")
 plt.show()
 
 # print paramaters included in best vals
-print(f'Parameters (z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2): {np.unique(best_z_s)}, {np.unique(best_z_p1)}, {np.unique(best_z_p2)}, {np.unique(best_z_r2)}, {np.unique(best_xs)}, {np.unique(best_xp1)}, {np.unique(best_xp2)}, {np.unique(best_xr2)}')
+# print(f'Parameters (z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2): {np.unique(best_z_s)}, {np.unique(best_z_p1)}, {np.unique(best_z_p2)}, {np.unique(best_z_r2)}, {np.unique(best_xs)}, {np.unique(best_xp1)}, {np.unique(best_xp2)}, {np.unique(best_xr2)}')
 
 # Display the top N unique combinations
-print("{:<5} {:<5} {:<5} {:<5} | {:<8} {:<8} {:<8} {:<8} | {:<10} {:<10} {:<10}".format(
-    "z_s", "z_p1", "z_p2", "z_r2", "xs", "xp1", "xp2", "xr2", "Ratio", "eta_fwd", "eta_bwd"
-))
+# print("{:<5} {:<5} {:<5} {:<5} | {:<8} {:<8} {:<8} {:<8} | {:<10} {:<10} {:<10}".format(
+#     "z_s", "z_p1", "z_p2", "z_r2", "xs", "xp1", "xp2", "xr2", "Ratio", "eta_fwd", "eta_bwd"
+# ))
 
-for i in range(min(TOP_COMBINATIONS, len(best_composite_score))):
-    print("{:<5} {:<5} {:<5} {:<5} | {:<8.3f} {:<8.3f} {:<8.3f} {:<8.3f} | {:<10.2f} {:<10.3f} {:<10.3f}".format(
-        best_z_s[i], 
-        best_z_p1[i], 
-        best_z_p2[i], 
-        best_z_r2[i], 
-        best_xs[i], 
-        best_xp1[i], 
-        best_xp2[i], 
-        best_xr2[i], 
-        best_ratios[i], 
-        best_eta_fwd[i], 
-        best_eta_bwd[i]
-    ))
+# for i in range(min(TOP_COMBINATIONS, len(best_composite_score))):
+#     print("{:<5} {:<5} {:<5} {:<5} | {:<8.3f} {:<8.3f} {:<8.3f} {:<8.3f} | {:<10.2f} {:<10.3f} {:<10.3f}".format(
+#         best_z_s[i], 
+#         best_z_p1[i], 
+#         best_z_p2[i], 
+#         best_z_r2[i], 
+#         best_xs[i], 
+#         best_xp1[i], 
+#         best_xp2[i], 
+#         best_xr2[i], 
+#         best_ratios[i], 
+#         best_eta_fwd[i], 
+#         best_eta_bwd[i]
+#     ))
 
 output_dir = os.path.join(os.path.dirname(__file__), "results")
 os.makedirs(output_dir, exist_ok=True)  # in case dir is not here
