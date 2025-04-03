@@ -25,11 +25,17 @@ def filter(df):
         print(f"{column_names[col]}: {candidate_lists[col]}")
     # Step 2: Filter rows that match the candidate lists
     filtered_rows = df[df.apply(lambda row: all(row[col] in candidate_lists[col] for col in range(n)), axis=1)].copy()
-    # Ensure all candidate values are covered
+    # Ensure all candidate values are covered while maintaining x values from parameter lists
     for col in range(n):
         missing_values = set(candidate_lists[col]) - set(filtered_rows[col].unique())
-        if missing_values:
-            additional_rows = df[df[col].isin(missing_values)]
+        if missing_values: # Ensure x values (indices 4-7) are from the parameter list
+            additional_rows = df[
+                (df[col].isin(missing_values)) & 
+                (df[4].isin(candidate_lists[4])) & 
+                (df[5].isin(candidate_lists[5])) & 
+                (df[6].isin(candidate_lists[6])) & 
+                (df[7].isin(candidate_lists[7]))
+            ]
             filtered_rows = pd.concat([filtered_rows, additional_rows]).drop_duplicates().reset_index(drop=True)
     print("\nAppearances in Filtered Results:")
     for col in range(n):
