@@ -207,3 +207,49 @@ def score_vals(in_vals, target_z_r1 = 90, add_gear = True):
 
     score = len(validated_vals[0][bd_indices])
     return score
+
+'''
+Function 'param_to_list'
+takes:  params - dictionary from Ax.dev detailing parameters
+gives: parm_list [7,1] list for use in score_vals  - [z_s, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
+
+'''
+def param_to_list(param):
+    each_val_len = len(param) // 7 # 7 parameters
+    param_list = []
+    for i in range(7):
+        if i == 0: # note first (z_s) inputs are actually z_s / 2 to enforce even values.
+            param_list.append(np.array(list(param.values())[i*each_val_len:(i+1)*each_val_len])*2)
+        else:
+            param_list.append(np.array(list(param.values())[i*each_val_len:(i+1)*each_val_len]))
+    return param_list
+
+
+def list_to_param(param_list, naming = ['z_s', 'z_p2', 'z_r2', 'x_s', 'x_p1', 'x_p2', 'x_r2'], vals_per = 3):
+    """
+    Function 'list_to_param'
+    takes: param_list [7,1] list for use in score_vals - [z_s, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
+    gives: params - dictionary from Ax.dev detailing parameters
+    """
+
+    param = {}
+
+    for ind in range(len(param_list)):
+        if naming[ind][0] == 'z':
+            if len(param_list[ind]) == 1:
+                param[naming[ind]] = int(param_list[ind][0])
+                continue
+            else:
+                param[naming[ind]] = int(param_list[ind][0])
+                for ind2 in range(1, vals_per):
+                    param[naming[ind] + '_' + str(ind2)] = int(param_list[ind][ind2])
+        elif naming[ind][0] == 'x':
+            if len(param_list[ind]) == 1:
+                param[naming[ind]] = float(param_list[ind][0])
+                continue
+            else:
+                param[naming[ind]] = float(param_list[ind][0])
+                for ind2 in range(1, vals_per):
+                    param[naming[ind] + '_' + str(ind2)] = float(param_list[ind][ind2])
+
+    return param
