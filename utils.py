@@ -37,9 +37,11 @@ returns: subset of input values that pass tolerance check: z_s, z_p1, z_p2, z_r2
 def validate_parameters(in_vals):
 
     # Calculate all possible combinations of gear ratios
-    z_s, z_p2, z_r2 = np.meshgrid(
+    z_sh, z_p2, z_r2 = np.meshgrid(
         *in_vals[:3], indexing='ij'
     )
+    
+    z_s = z_sh * 2 # enforce even values for z_s
 
     z_r1 = target_z_r1
     z_p1 = (z_r1 - z_s)/2
@@ -106,7 +108,9 @@ def validate_parameters(in_vals):
 
     assert z_s.shape == z_p1.shape == z_p2.shape == z_r2.shape == xs.shape == xp1.shape == xp2.shape == xr2.shape == ratios.shape
 
-    return z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, I1, I2, gr_s, ratios
+    z_sh = z_s / 2 # convert back to z_s / 2 for output
+
+    return z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, I1, I2, gr_s, ratios
 
 '''
 Function 'efficiency_calc'
@@ -114,7 +118,8 @@ takes:
 gives: fwd efficiency
        bwd eddiciency
 '''
-def efficiency_calc(z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, I1, I2, gr_s, ratios):
+def efficiency_calc(z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, I1, I2, gr_s, ratios):
+    z_s = z_sh * 2 # enforce even values for z_s
     ra = (z_s * MODULE + z_p1 * MODULE) / 2.0
 
     # Basic circle diameters
@@ -180,7 +185,7 @@ def efficiency_calc(z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, I1, I2, gr_s, rati
 
 '''
 Function 'score vals'
-takes:  in_vals (parameters to sweep) [7,1] list of  - [z_s, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
+takes:  in_vals (parameters to sweep) [7,1] list of  - [z_sh, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
         target_z_r1 - target gears for ring 1 ()
         add_gear - boolean whether to also add in the values from Matsuki 2019 paper
 gives: score [scalar] - number of valid combinations
@@ -191,7 +196,7 @@ NOTE - for scores to be transferable, give the same size vectors across differen
 def score_vals(in_vals, target_z_r1 = 90, add_gear = True):
 
     # 2019 Matsuki 'Table 3' values
-    paper_vals = [12, 32, 81, .476, .762, .536, 1.2]
+    paper_vals = [6, 32, 81, .476, .762, .536, 1.2] # NOTE - 6 = 12 (z_s) / 2.
 
     if add_gear:
         for i in range(len(in_vals)):
@@ -211,21 +216,22 @@ def score_vals(in_vals, target_z_r1 = 90, add_gear = True):
 '''
 Function 'param_to_list'
 takes:  params - dictionary from Ax.dev detailing parameters
-gives: parm_list [7,1] list for use in score_vals  - [z_s, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
+gives: parm_list [7,1] list for use in score_vals  - [z_sh, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
 
 '''
 def param_to_list(param):
     each_val_len = len(param) // 7 # 7 parameters
     param_list = []
     for i in range(7):
-        if i == 0: # note first (z_s) inputs are actually z_s / 2 to enforce even values.
-            param_list.append(np.array(list(param.values())[i*each_val_len:(i+1)*each_val_len])*2)
-        else:
-            param_list.append(np.array(list(param.values())[i*each_val_len:(i+1)*each_val_len]))
+        # if i == 0: # note first (z_s) inputs are actually z_s / 2 to enforce even values.
+        #     param_list.append(np.array(list(param.values())[i*each_val_len:(i+1)*each_val_len])*2)
+        # else:
+        # NOTE - as of 4/5, we don't ever think of 'z_s', we use 'z_sh' (half value)
+        param_list.append(np.array(list(param.values())[i*each_val_len:(i+1)*each_val_len]))
     return param_list
 
 
-def list_to_param(param_list, naming = ['z_s', 'z_p2', 'z_r2', 'x_s', 'x_p1', 'x_p2', 'x_r2'], vals_per = 3):
+def list_to_param(param_list, naming = ['z_sh', 'z_p2', 'z_r2', 'x_s', 'x_p1', 'x_p2', 'x_r2'], vals_per = 3):
     """
     Function 'list_to_param'
     takes: param_list [7,1] list for use in score_vals - [z_s, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
