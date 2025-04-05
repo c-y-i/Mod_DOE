@@ -202,7 +202,7 @@ def score_vals(in_vals, target_z_r1 = 90, add_gear = True):
         for i in range(len(in_vals)):
             in_vals[i] = np.hstack([in_vals[i], paper_vals[i]])
 
-    # validated_vals = z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, I1, I2, gr_s, ratios
+    # validated_vals = z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, I1, I2, gr_s, ratios
     validated_vals = validate_parameters(in_vals)
 
     eta_fwd, eta_bwd = efficiency_calc(*validated_vals)
@@ -234,7 +234,7 @@ def param_to_list(param):
 def list_to_param(param_list, naming = ['z_sh', 'z_p2', 'z_r2', 'x_s', 'x_p1', 'x_p2', 'x_r2'], vals_per = 3):
     """
     Function 'list_to_param'
-    takes: param_list [7,1] list for use in score_vals - [z_s, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
+    takes: param_list [7,1] list for use in score_vals - [z_sh, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
     gives: params - dictionary from Ax.dev detailing parameters
     """
 
