@@ -37,14 +37,16 @@ returns: subset of input values that pass tolerance check: z_s, z_p1, z_p2, z_r2
 def validate_parameters(in_vals):
 
     # Calculate all possible combinations of gear ratios
-    z_sh, z_p2, z_r2 = np.meshgrid(
-        *in_vals[:3], indexing='ij'
+    z_sh, z_p2, z_r2, xs, xp1 = np.meshgrid(
+        *in_vals[:5], indexing='ij'
     )
     
     z_s = z_sh * 2 # enforce even values for z_s
 
     z_r1 = target_z_r1
-    z_p1 = (z_r1 - z_s)/2
+    xr1 = 0 #set zero profile shift coefficient
+    # z_p1 = (z_r1 - z_s)/2
+    z_p1 = floor((z_r1+2*xr1-z_s-2*xs))
     non_integers = z_p1[np.mod(z_p1, 1) != 0]
     if len(non_integers) > 0:
         print('Invalid z_s values (not divisble by 2)')
@@ -60,6 +62,8 @@ def validate_parameters(in_vals):
     filt_z_s = np.unique(z_s[valid_combinations])
     filt_z_p2 = np.unique(z_p2[valid_combinations])
     filt_z_r2 = np.unique(z_r2[valid_combinations])
+    
+    
 
     z_s, z_p2, z_r2, xs, xp1, xp2, xr2 = np.meshgrid(
         filt_z_s, filt_z_p2, filt_z_r2, *in_vals[3:], indexing='ij'
@@ -87,7 +91,7 @@ def validate_parameters(in_vals):
     valid_combinations = np.logical_and(np.logical_and(gr_s > 0, np.abs(TARGET_GEAR_RATIO - ratios) <= RATIO_TOLERANCE), z_s + 2 * z_p1 == z_r1)
 
     # only keep valid combinations (ratios w.in tolerance)
-    tol = 0.1 # let's start with 0.1, the allowable tolerance in table III is 0.09 as a reference.
+    tol = 0.2 # let's start with 0.1, the allowable tolerance in table III is 0.09 as a reference.
 
     # Stage 2 constraint Ring 2 + Planet 2
     # Derived equation: (z_r2 - z_p2) = (MODULE/MC) * (z_s + z_p1 + 2 * (xs + xp1)) - 2 * (xr2 - xp2)
@@ -97,7 +101,11 @@ def validate_parameters(in_vals):
     # TODO: check if this is the right way to include x values, right now im going off the equations from this page
     # https://www.tec-science.com/mechanical-power-transmission/involute-gear/profile-shift/#:~:text=Profile%20shift%20coefficient,For%20the%20corresponding%20diameters%20applies:
 
+    print(ls_stage2 - rs_stage2)
+
     stage_2_constraint = np.abs(ls_stage2 - rs_stage2) < tol # check with tolerance 
+
+    print(f"Total combinations: {total_combinations}, Valid combinations: {np.sum(valid_combinations)}, Stage 2 constraint: {np.sum(stage_2_constraint)}")
 
     # check it again with existing valid combos...
     valid_combinations = np.logical_and(valid_combinations, stage_2_constraint)
