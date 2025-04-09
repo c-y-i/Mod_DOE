@@ -72,7 +72,6 @@ def generate_all_options(sun_limits: tuple, p1_limits: tuple, p2_limits: tuple, 
         "r2": generate_options(r2_limits[0], r2_limits[1], step_r2)
     }
 
-# %%
 options = generate_all_options(SUN_LIMITS, P1_LIMITS, P2_LIMITS, R2_LIMITS, STEPS)
 sun_options = options["sun"]
 p1_options  = options["p1"]
@@ -82,6 +81,16 @@ xs_options = generate_range_options(config["XS_RANGE"])
 xp1_options = generate_range_options(config["XP1_RANGE"])
 xp2_options = generate_range_options(config["XP2_RANGE"])
 xr2_options = generate_range_options(config["XR2_RANGE"])
+
+# sun_options = [12, 18, 14, 16]
+# p1_options = [39, 36, 38, 37]
+# p2_options = [32, 31, 33, 30]
+# r2_options = [83, 82, 81, 80]
+
+# xs_options = [0.3, 0.476, 0.6, 0.7]
+# xp1_options = [0.6, 0.762, 0.9, 1.0]
+# xp2_options = [0.536, -0.5, -0.4, -0.3]
+# xr2_options = [1.21, 0.5, 0.4, 0.3]
 
 # %%
 def view_vector(input_vector, subsample, title, y_lims=None):
