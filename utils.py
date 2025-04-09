@@ -16,147 +16,120 @@ config_path = os.path.join(os.path.dirname(__file__), 'wolfrom', "config.json")
 with open(config_path, "r") as f:
     config = json.load(f)
 
-MODULE = config["MODULE"]
+MA = config["MODULE"]
 MU = config["MU"]
-MC = config.get("MC", MODULE)
+MC = config.get("MC", MA)
 ALPHA = np.radians(config.get("ALPHA", 20))
 XR1 = config.get("XR1", 0.0)
 N_PLANETS = config["N_PLANETS"]
 TARGET_GEAR_RATIO = 100
 RATIO_TOLERANCE = 10
-target_z_r1 = 90
+TARG_zr1 = 90
+TARG_xr1 = 0
+
 
 '''
 Function 'validate parameters'
-takes: in_vals (parameters to sweep) [7,n] - [z_s, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
+takes: in_vals (parameters to sweep) [5,n] - [z_sh, z_r2, xs, xr2, Cl]
        target_z_r1 - target gears for ring 1 ()
+       target_xr1 - target profile shift for ring 1 ()
 
-returns: subset of input values that pass tolerance check: z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2
+returns: design_vals: [z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, carrier]
          calculated values: I1, I2, gr_s, ratios
 '''
-def validate_parameters(in_vals):
+def validate_parameters(in_vals, target_z_r1 = TARG_zr1, target_xr1 = TARG_xr1):
 
     # Calculate all possible combinations of gear ratios
-    z_sh, z_p2, z_r2, xs, xp1 = np.meshgrid(
-        *in_vals[:5], indexing='ij'
+    z_sh, z_r2, xs, xr2, Cl = np.meshgrid(
+        *in_vals, indexing='ij'
     )
 
+    Cl = Cl.flatten()
+
+    print(f'In-vector mesh shape: {z_sh.shape}')
+    print(f'In-vector mesh len: {len(Cl)}')
+
+    Cl_1 = Cl_2 = Cl_3 = Cl
+
     z_sh = z_sh.flatten()
-    z_p2 = z_p2.flatten()
     z_r2 = z_r2.flatten()
     xs = xs.flatten()
-    xp1 = xp1.flatten()
-    
+    xr2 = xr2.flatten()
+
     z_s = z_sh * 2 # enforce even values for z_s
 
     z_r1 = target_z_r1
-    xr1 = 2 #set zero profile shift coefficient
-    # z_p1 = (z_r1 - z_s)/2
-    z_p1 = np.floor((z_r1+2*xr1-z_s-2*xs-4*xp1)/2)
-    # non_integers = z_p1[np.mod(z_p1, 1) != 0]
-    # if len(non_integers) > 0:
-    #     print('Invalid z_s values (not divisble by 2)')
-    #     return 0
-    
+    xr1 = target_xr1 
+
+    eqn1 = (z_r1+2*xr1-z_s-2*xs)/2 - (Cl_1 + Cl_2)/MA
+    z_p1 = np.floor(eqn1)
+    xp1 = (eqn1 - z_p1)/2
+
+    eqn2 = MA/MC*((z_p1+2*xp1) - (z_r1+2*xr1)) + (z_r2 + 2*xr2) + 2/MC*(Cl_2 - Cl_3)
+    z_p2 = np.floor(eqn2)
+    xp2 = (eqn2 - z_p2)/2
+
+    # solve r_a / r_b / r_c
+    r_a = MA * (z_s + z_p1)/2 + MA *(xs + xp1) + Cl
 
     I1 = z_r1 / z_s
     I2 = (z_r1 * z_p2) / (z_p1 * z_r2)
     gr_s = (1 - I2) / (1 + I1)
     ratios = 1 / gr_s
 
-    # only keep valid combinations (ratios w.in tolerance)
-    valid_combinations = np.logical_and(gr_s > 0, np.abs(TARGET_GEAR_RATIO - ratios) <= RATIO_TOLERANCE)
-
-    filt_z_s = np.unique(z_s[valid_combinations])
-    filt_z_p2 = np.unique(z_p2[valid_combinations])
-    filt_z_r2 = np.unique(z_r2[valid_combinations])
-    filt_xs = np.unique(xs[valid_combinations])
-    filt_xp1 = np.unique(xp1[valid_combinations])
-    
-    z_s, z_p2, z_r2, xs, xp1, xp2, xr2 = np.meshgrid(
-        filt_z_s, filt_z_p2, filt_z_r2, filt_xs, filt_xp1, *in_vals[5:], indexing='ij'
-    )
-
-    # flatten
-    z_s = z_s.flatten()
-    z_p2 = z_p2.flatten()
-    z_r2 = z_r2.flatten()
-    xs = xs.flatten()
-    xp1 = xp1.flatten()
-    xp2 = xp2.flatten()
-    xr2 = xr2.flatten()
-
-    z_p1 = (z_r1 - z_s)/2
-
-    I1 = z_r1 / z_s
-    I2 = (z_r1 * z_p2) / (z_p1 * z_r2)
-    gr_s = (1 - I2) / (1 + I1)
-    ratios = 1 / gr_s
-
+    # TODO - add back in target gear ratio (?) - would need to take into account +/- values.
+    # example: valid_combinations = np.abs(TARGET_GEAR_RATIO - np.abs(ratios))
     
     total_combinations = z_s.size
 
-    valid_combinations = np.logical_and(np.logical_and(gr_s > 0, np.abs(TARGET_GEAR_RATIO - ratios) <= RATIO_TOLERANCE), z_s + 2 * z_p1 == z_r1)
+    # print(f"Total combinations: {total_combinations}, Valid combinations: {np.sum(valid_combinations)}, Stage 2 constraint: {np.sum(stage_2_constraint)}")
 
-    # only keep valid combinations (ratios w.in tolerance)
-    tol = 0.2 # let's start with 0.1, the allowable tolerance in table III is 0.09 as a reference.
-
-    # Stage 2 constraint Ring 2 + Planet 2
-    # Derived equation: (z_r2 - z_p2) = (MODULE/MC) * (z_s + z_p1 + 2 * (xs + xp1)) - 2 * (xr2 - xp2)
-    ls_stage2 = z_r2 - z_p2 # left side of eq
-    rs_stage2 = (MODULE / MC) * (z_s + z_p1 + 2 * (xs + xp1)) - 2 * (xr2 - xp2) # right side of eq
-
-    # TODO: check if this is the right way to include x values, right now im going off the equations from this page
-    # https://www.tec-science.com/mechanical-power-transmission/involute-gear/profile-shift/#:~:text=Profile%20shift%20coefficient,For%20the%20corresponding%20diameters%20applies:
-
-    print(ls_stage2 - rs_stage2)
-
-    stage_2_constraint = np.abs(ls_stage2 - rs_stage2) < tol # check with tolerance 
-
-    print(f"Total combinations: {total_combinations}, Valid combinations: {np.sum(valid_combinations)}, Stage 2 constraint: {np.sum(stage_2_constraint)}")
-
-    # check it again with existing valid combos...
-    valid_combinations = np.logical_and(valid_combinations, stage_2_constraint)
-
-    # z_r1 = z_r1[valid_combinations]
-    z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2 = z_s[valid_combinations], z_p1[valid_combinations], z_p2[valid_combinations], z_r2[valid_combinations], xs[valid_combinations], xp1[valid_combinations], xp2[valid_combinations], xr2[valid_combinations]
-    I1, I2, gr_s, ratios = I1[valid_combinations], I2[valid_combinations], gr_s[valid_combinations], ratios[valid_combinations]
+    # # z_r1 = z_r1[valid_combinations]
+    # z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2 = z_s[valid_combinations], z_p1[valid_combinations], z_p2[valid_combinations], z_r2[valid_combinations], xs[valid_combinations], xp1[valid_combinations], xp2[valid_combinations], xr2[valid_combinations]
+    # I1, I2, gr_s, ratios = I1[valid_combinations], I2[valid_combinations], gr_s[valid_combinations], ratios[valid_combinations]
 
     assert z_s.shape == z_p1.shape == z_p2.shape == z_r2.shape == xs.shape == xp1.shape == xp2.shape == xr2.shape == ratios.shape
 
     z_sh = z_s / 2 # convert back to z_s / 2 for output
 
-    return z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, I1, I2, gr_s, ratios
+    design_vals = [z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, r_a]
+
+    return design_vals, I1, I2, gr_s, ratios
 
 '''
 Function 'efficiency_calc'
-takes:
+takes: design_vals [8,n] - [z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, r_a]
 gives: fwd efficiency
        bwd eddiciency
 '''
-def efficiency_calc(z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, I1, I2, gr_s, ratios):
+def efficiency_calc(design_vals, target_z_r1 = TARG_zr1):
+    z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, ra = design_vals
     z_s = z_sh * 2 # enforce even values for z_s
-    ra = (z_s * MODULE + z_p1 * MODULE) / 2.0
+
+    z_r1 = TARG_zr1
+
+    I1 = z_r1 / z_s
+    I2 = (z_r1 * z_p2) / (z_p1 * z_r2)
 
     # Basic circle diameters
-    db_a1 = MODULE * z_s * np.cos(ALPHA)
-    db_a2 = MODULE * z_p1 * np.cos(ALPHA)
-    db_b1 = MODULE * z_p1 * np.cos(ALPHA)
-    db_b2 = MODULE * target_z_r1 * np.cos(ALPHA)
+    db_a1 = MA * z_s * np.cos(ALPHA)
+    db_a2 = MA * z_p1 * np.cos(ALPHA)
+    db_b1 = MA * z_p1 * np.cos(ALPHA)
+    db_b2 = MA * target_z_r1 * np.cos(ALPHA)
     db_c1 = MC * z_p2 * np.cos(ALPHA)
     db_c2 = MC * z_r2 * np.cos(ALPHA)
 
     # Working pressure angles (modified formula)
-    alpha_wa = np.arccos(MODULE * (z_s + z_p1) * np.cos(ALPHA) / (2 * ra))
-    alpha_wb = np.arccos(MODULE * (-z_p1 + target_z_r1) * np.cos(ALPHA) / (2 * ra)) # why is this constant??
+    alpha_wa = np.arccos(MA * (z_s + z_p1) * np.cos(ALPHA) / (2 * ra))
+    alpha_wb = np.arccos(MA * (-z_p1 + target_z_r1) * np.cos(ALPHA) / (2 * ra)) # why is this constant??
     val = MC * (-z_p2 + z_r2) * np.cos(ALPHA) / (2 * ra)
     alpha_wc = np.arccos(np.clip(val, -1, 1))
     # Center distance modification coefficient
     ya = ((z_s + z_p1) / 2.0) * ((np.cos(ALPHA) / np.cos(alpha_wa)) - 1)
     # Tip circle diameters
-    das  = MODULE * z_s + 2 * MODULE * (1 + ya - xp1)
-    dap1 = MODULE * z_p1 + 2 * MODULE * (1 + np.minimum(ya - xs, xp1))
-    dar1 = MODULE * target_z_r1 - 2 * MODULE * (1 - XR1)
+    das  = MA * z_s + 2 * MA * (1 + ya - xp1)
+    dap1 = MA * z_p1 + 2 * MA * (1 + np.minimum(ya - xs, xp1))
+    dar1 = MA * target_z_r1 - 2 * MA * (1 - XR1)
     dap2 = MC * z_p2 + 2 * MC * (1 + xp2)
     dar2 = MC * z_r2 - 2 * MC * (1 - xr2)
     # Tip pressure angles
@@ -197,48 +170,51 @@ def efficiency_calc(z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, I1, I2, gr_s, rat
 
     return eta_fwd, eta_bwd
 
-
-
 '''
 Function 'score vals'
-takes:  in_vals (parameters to sweep) [7,1] list of  - [z_sh, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
-        target_z_r1 - target gears for ring 1 ()
+takes:  in_vals (parameters to sweep) [5,1] list of  - 
         add_gear - boolean whether to also add in the values from Matsuki 2019 paper
 gives: score [scalar] - number of valid combinations
 NOTE - for scores to be transferable, give the same size vectors across different in_vals
 
 '''
 
-def score_vals(in_vals, target_z_r1 = 90, add_gear = True):
+def score_vals(in_vals, add_gear = True):
 
     # 2019 Matsuki 'Table 3' values
-    paper_vals = [6, 32, 81, .476, .762, .536, 1.2] # NOTE - 6 = 12 (z_s) / 2.
+    paper_vals = [6, 81, .476, 1.2, 0, 0, 0] # NOTE - 6 = 12 (z_s) / 2.
 
     if add_gear:
         for i in range(len(in_vals)):
             in_vals[i] = np.hstack([in_vals[i], paper_vals[i]])
 
-    # validated_vals = z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, I1, I2, gr_s, ratios
-    validated_vals = validate_parameters(in_vals)
+    # validated_design_vals = z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, r_a, I1, I2, gr_s, ratios
+    validated_design_vals, I1, I2, gr_s, ratios = validate_parameters(in_vals)
 
-    eta_fwd, eta_bwd = efficiency_calc(*validated_vals)
+    print(np.array(validated_design_vals).shape)
+
+    eta_fwd, eta_bwd = efficiency_calc(validated_design_vals)
+    print(f'Efficiencies: Front - {eta_fwd}, Back - {eta_bwd}')
 
     # composite_score = ratios * eta_fwd * eta_bwd # possibly useful in future ?
     bd_indices = np.where(eta_bwd > 0.3)
 
-    score = len(validated_vals[0][bd_indices])
+    score = len(validated_design_vals[0][bd_indices]) # how many valid z_s (valid sets total)?
+    best_score = len(validated_design_vals[0])
+    print(f'Score compare: best - {best_score}, current - {score}')
     return score
 
 '''
 Function 'param_to_list'
 takes:  params - dictionary from Ax.dev detailing parameters
-gives: parm_list [7,1] list for use in score_vals  - [z_sh, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
+gives: parm_list [5,1] list for use in score_vals  - [z_sh, z_r2, xs, xr2, Cl]
 
 '''
 def param_to_list(param):
-    each_val_len = len(param) // 7 # 7 parameters
+    num_param = 5
+    each_val_len = len(param) // num_param # n = 5 parameters
     param_list = []
-    for i in range(7):
+    for i in range(num_param):
         # if i == 0: # note first (z_s) inputs are actually z_s / 2 to enforce even values.
         #     param_list.append(np.array(list(param.values())[i*each_val_len:(i+1)*each_val_len])*2)
         # else:
@@ -247,10 +223,10 @@ def param_to_list(param):
     return param_list
 
 
-def list_to_param(param_list, naming = ['z_sh', 'z_p2', 'z_r2', 'x_s', 'x_p1', 'x_p2', 'x_r2'], vals_per = 3):
+def list_to_param(param_list, naming = ['z_sh', 'z_r2', 'xs', 'xr2', 'Cl'], vals_per = 3):
     """
     Function 'list_to_param'
-    takes: param_list [7,1] list for use in score_vals - [z_sh, z_p2, z_r2, x_s, x_p1, x_p2, x_r2]
+    takes: param_list [7,1] list for use in score_vals - [z_sh, z_r2, xs, xr2, Cl]
     gives: params - dictionary from Ax.dev detailing parameters
     """
 
