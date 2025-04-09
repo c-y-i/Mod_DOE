@@ -40,17 +40,24 @@ def validate_parameters(in_vals):
     z_sh, z_p2, z_r2, xs, xp1 = np.meshgrid(
         *in_vals[:5], indexing='ij'
     )
+
+    z_sh = z_sh.flatten()
+    z_p2 = z_p2.flatten()
+    z_r2 = z_r2.flatten()
+    xs = xs.flatten()
+    xp1 = xp1.flatten()
     
     z_s = z_sh * 2 # enforce even values for z_s
 
     z_r1 = target_z_r1
-    xr1 = 0 #set zero profile shift coefficient
+    xr1 = 2 #set zero profile shift coefficient
     # z_p1 = (z_r1 - z_s)/2
-    z_p1 = floor((z_r1+2*xr1-z_s-2*xs))
-    non_integers = z_p1[np.mod(z_p1, 1) != 0]
-    if len(non_integers) > 0:
-        print('Invalid z_s values (not divisble by 2)')
-        return 0
+    z_p1 = np.floor((z_r1+2*xr1-z_s-2*xs-4*xp1)/2)
+    # non_integers = z_p1[np.mod(z_p1, 1) != 0]
+    # if len(non_integers) > 0:
+    #     print('Invalid z_s values (not divisble by 2)')
+    #     return 0
+    
 
     I1 = z_r1 / z_s
     I2 = (z_r1 * z_p2) / (z_p1 * z_r2)
@@ -59,14 +66,15 @@ def validate_parameters(in_vals):
 
     # only keep valid combinations (ratios w.in tolerance)
     valid_combinations = np.logical_and(gr_s > 0, np.abs(TARGET_GEAR_RATIO - ratios) <= RATIO_TOLERANCE)
+
     filt_z_s = np.unique(z_s[valid_combinations])
     filt_z_p2 = np.unique(z_p2[valid_combinations])
     filt_z_r2 = np.unique(z_r2[valid_combinations])
+    filt_xs = np.unique(xs[valid_combinations])
+    filt_xp1 = np.unique(xp1[valid_combinations])
     
-    
-
     z_s, z_p2, z_r2, xs, xp1, xp2, xr2 = np.meshgrid(
-        filt_z_s, filt_z_p2, filt_z_r2, *in_vals[3:], indexing='ij'
+        filt_z_s, filt_z_p2, filt_z_r2, filt_xs, filt_xp1, *in_vals[5:], indexing='ij'
     )
 
     # flatten
