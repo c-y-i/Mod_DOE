@@ -46,9 +46,6 @@ def validate_parameters(in_vals, target_z_r1 = TARG_zr1, target_xr1 = TARG_xr1):
 
     Cl = Cl.flatten()
 
-    print(f'In-vector mesh shape: {z_sh.shape}')
-    print(f'In-vector mesh len: {len(Cl)}')
-
     Cl_1 = Cl_2 = Cl_3 = Cl
 
     z_sh = z_sh.flatten()
@@ -124,6 +121,7 @@ def efficiency_calc(design_vals, target_z_r1 = TARG_zr1):
     alpha_wb = np.arccos(MA * (-z_p1 + target_z_r1) * np.cos(ALPHA) / (2 * ra)) # why is this constant??
     val = MC * (-z_p2 + z_r2) * np.cos(ALPHA) / (2 * ra)
     alpha_wc = np.arccos(np.clip(val, -1, 1))
+
     # Center distance modification coefficient
     ya = ((z_s + z_p1) / 2.0) * ((np.cos(ALPHA) / np.cos(alpha_wa)) - 1)
     # Tip circle diameters
@@ -132,6 +130,7 @@ def efficiency_calc(design_vals, target_z_r1 = TARG_zr1):
     dar1 = MA * target_z_r1 - 2 * MA * (1 - XR1)
     dap2 = MC * z_p2 + 2 * MC * (1 + xp2)
     dar2 = MC * z_r2 - 2 * MC * (1 - xr2)
+
     # Tip pressure angles
     alpha_aa1 = np.arccos(db_a1 / das)
     alpha_aa2 = np.arccos(db_a2 / dap1)
@@ -150,6 +149,7 @@ def efficiency_calc(design_vals, target_z_r1 = TARG_zr1):
     ea = ea1**2 + ea2**2 - ea1 - ea2 + 1
     eb = eb1**2 + eb2**2 - eb1 - eb2 + 1
     ec = ec1**2 + ec2**2 - ec1 - ec2 + 1
+
     # Basic driving efficiencies
     Ea_val = 1 - MU* np.pi * (1 / z_s + 1 / z_p1) * ea
     Eb_val = 1 - MU* np.pi * (1 / z_p1 - 1 / target_z_r1) * eb
@@ -172,8 +172,9 @@ def efficiency_calc(design_vals, target_z_r1 = TARG_zr1):
 
 '''
 Function 'score vals'
-takes:  in_vals (parameters to sweep) [5,1] list of  - 
+takes:  in_vals (parameters to sweep) [5,1] list of  - [z_sh, z_r2, xs, xr2, Cl] OR [4,1] if add_cl is True.
         add_gear - boolean whether to also add in the values from Matsuki 2019 paper
+        add_cl - boolean whether to also add in set Cl values (False means they will be given)
 gives: score [scalar] - number of valid combinations
 NOTE - for scores to be transferable, give the same size vectors across different in_vals
 
@@ -181,54 +182,68 @@ NOTE - for scores to be transferable, give the same size vectors across differen
 
 def score_vals(in_vals, add_gear = True):
 
+    # print(in_vals)
+
     # 2019 Matsuki 'Table 3' values
-    paper_vals = [6, 81, .476, 1.2, 0, 0, 0] # NOTE - 6 = 12 (z_s) / 2.
+    paper_vals = [6, 81, .476, 1.0, 0.1e-3, 0, 0] # NOTE - 6 = 12 (z_s) / 2. 1.0 is as close as we can get to x_r2 = 1.2
 
     if add_gear:
         for i in range(len(in_vals)):
             in_vals[i] = np.hstack([in_vals[i], paper_vals[i]])
 
+    # print(in_vals)
+
     # validated_design_vals = z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, r_a, I1, I2, gr_s, ratios
     validated_design_vals, I1, I2, gr_s, ratios = validate_parameters(in_vals)
 
-    print(np.array(validated_design_vals).shape)
-
     eta_fwd, eta_bwd = efficiency_calc(validated_design_vals)
-    print(f'Efficiencies: Front - {eta_fwd}, Back - {eta_bwd}')
 
     # composite_score = ratios * eta_fwd * eta_bwd # possibly useful in future ?
     bd_indices = np.where(eta_bwd > 0.3)
 
     score = len(validated_design_vals[0][bd_indices]) # how many valid z_s (valid sets total)?
     best_score = len(validated_design_vals[0])
-    print(f'Score compare: best - {best_score}, current - {score}')
+    # print(f'Score compare: best - {best_score}, current - {score}')
     return score
 
 '''
 Function 'param_to_list'
 takes:  params - dictionary from Ax.dev detailing parameters
-gives: parm_list [5,1] list for use in score_vals  - [z_sh, z_r2, xs, xr2, Cl]
+        add_cl - boolean whether to also add in set Cl values (False means they will be given)
+gives: parm_list [5,n] list for use in score_vals  - [z_sh, z_r2, xs, xr2, Cl]
 
 '''
-def param_to_list(param):
-    num_param = 5
-    each_val_len = len(param) // num_param # n = 5 parameters
+def param_to_list(param, add_cl = False):
+    if add_cl:
+        num_param = 4
+    else:
+        num_param = 5
+    each_val_len = len(param) // num_param # n = 3 parameters (usually)
+
     param_list = []
     for i in range(num_param):
-        # if i == 0: # note first (z_s) inputs are actually z_s / 2 to enforce even values.
-        #     param_list.append(np.array(list(param.values())[i*each_val_len:(i+1)*each_val_len])*2)
-        # else:
-        # NOTE - as of 4/5, we don't ever think of 'z_s', we use 'z_sh' (half value)
         param_list.append(np.array(list(param.values())[i*each_val_len:(i+1)*each_val_len]))
+    
+    if add_cl:
+        # add in set Clearance values
+        set_Cl = np.array([0.2e-3, 0.3e-3, 0.4e-3])
+        param_list.append(set_Cl)
+
     return param_list
 
 
-def list_to_param(param_list, naming = ['z_sh', 'z_r2', 'xs', 'xr2', 'Cl'], vals_per = 3):
+def list_to_param(param_list, vals_per = 3):
     """
     Function 'list_to_param'
-    takes: param_list [7,1] list for use in score_vals - [z_sh, z_r2, xs, xr2, Cl]
+    takes: param_list [5,1] list for use in score_vals - [z_sh, z_r2, xs, xr2, Cl]
     gives: params - dictionary from Ax.dev detailing parameters
     """
+
+    if len(param_list) == 4:
+        naming = ['z_sh', 'z_r2', 'xs', 'xr2']
+    elif len(param_list) == 5:
+        naming = ['z_sh', 'z_r2', 'xs', 'xr2', 'Cl']
+
 
     param = {}
 
@@ -241,7 +256,7 @@ def list_to_param(param_list, naming = ['z_sh', 'z_r2', 'xs', 'xr2', 'Cl'], vals
                 param[naming[ind]] = int(param_list[ind][0])
                 for ind2 in range(1, vals_per):
                     param[naming[ind] + '_' + str(ind2)] = int(param_list[ind][ind2])
-        elif naming[ind][0] == 'x':
+        elif naming[ind][0] == 'x' or naming[ind][0] == 'C':
             if len(param_list[ind]) == 1:
                 param[naming[ind]] = float(param_list[ind][0])
                 continue
