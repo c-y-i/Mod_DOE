@@ -202,9 +202,9 @@ def score_vals(in_vals, add_gear = True):
     bd_indices = np.where(eta_bwd > 0.3)
 
     score = len(validated_design_vals[0][bd_indices]) # how many valid z_s (valid sets total)?
-    best_score = len(validated_design_vals[0])
-    # print(f'Score compare: best - {best_score}, current - {score}')
-    return score
+    gr_score = np.mean(ratios[bd_indices])*len(validated_design_vals[0][bd_indices]) # average gear ratio (among working) * number of valid z_s (valid sets)
+    # print(f'Score compare: best - {best_score}, current - {score}')len(validated_design_vals[0][bd_indices])
+    return gr_score
 
 '''
 Function 'param_to_list'
@@ -226,7 +226,10 @@ def param_to_list(param, add_cl = False):
     
     if add_cl:
         # add in set Clearance values
-        set_Cl = np.array([0.2e-3, 0.3e-3, 0.4e-3])
+        if each_val_len == 3:
+            set_Cl = np.array([0.2e-3, 0.3e-3, 0.4e-3])
+        elif each_val_len == 4:
+            set_Cl = np.array([0.1e-3, 0.2e-3, 0.3e-3, 0.4e-3])
         param_list.append(set_Cl)
 
     return param_list
