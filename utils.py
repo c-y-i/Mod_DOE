@@ -59,19 +59,23 @@ def validate_parameters(in_vals, target_z_r1 = TARG_zr1, target_xr1 = TARG_xr1):
     xr1 = target_xr1 
 
     eqn1 = (z_r1+2*xr1-z_s-2*xs)/2 - (Cl_1 + Cl_2)/MA
-    z_p1 = np.floor(eqn1)
-    xp1 = (eqn1 - z_p1)/2
+    # NOTE - the following is a restrictive design choice, mostly for convenience in CAD
+    # and for reliably reconciling this equation.
+    z_p1 = np.floor(eqn1) 
+    xp1 = (eqn1 - z_p1)/2 # limits xp1 between 0 and 0.5
 
     eqn2 = MA/MC*((z_p1+2*xp1) - (z_r1+2*xr1)) + (z_r2 + 2*xr2) + 2/MC*(Cl_2 - Cl_3)
+    # NOTE - the following is a restrictive design choice, mostly for convenience in CAD
+    # and for reliably reconciling this equation.
     z_p2 = np.floor(eqn2)
-    xp2 = (eqn2 - z_p2)/2
+    xp2 = (eqn2 - z_p2)/2 # limits xp2 between 0 and 0.5
 
     # solve r_a / r_b / r_c
     r_a = MA * (z_s + z_p1)/2 + MA *(xs + xp1) + Cl
 
     I1 = z_r1 / z_s
     I2 = (z_r1 * z_p2) / (z_p1 * z_r2)
-    gr_s = (1 - I2) / (1 + I1)
+    gr_s = np.abs((1 - I2) / (1 + I1))
     ratios = 1 / gr_s
 
     # TODO - add back in target gear ratio (?) - would need to take into account +/- values.
@@ -99,7 +103,7 @@ takes: design_vals [8,n] - [z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, r_a]
 gives: fwd efficiency
        bwd eddiciency
 '''
-def efficiency_calc(design_vals, target_z_r1 = TARG_zr1):
+def efficiency_calc(design_vals, target_z_r1 = TARG_zr1, mu = MU):
     z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, ra = design_vals
     z_s = z_sh * 2 # enforce even values for z_s
 
@@ -151,9 +155,9 @@ def efficiency_calc(design_vals, target_z_r1 = TARG_zr1):
     ec = ec1**2 + ec2**2 - ec1 - ec2 + 1
 
     # Basic driving efficiencies
-    Ea_val = 1 - MU* np.pi * (1 / z_s + 1 / z_p1) * ea
-    Eb_val = 1 - MU* np.pi * (1 / z_p1 - 1 / target_z_r1) * eb
-    Ec_val = 1 - MU* np.pi * (1 / z_p2 - 1 / z_r2) * ec
+    Ea_val = 1 - mu* np.pi * (1 / z_s + 1 / z_p1) * ea
+    Eb_val = 1 - mu* np.pi * (1 / z_p1 - 1 / target_z_r1) * eb
+    Ec_val = 1 - mu* np.pi * (1 / z_p2 - 1 / z_r2) * ec
     # Forward driving efficiency 
     eta_fwd = (1 + Ea_val * Eb_val * I1) * (1 - I2) / ((1 + I1) * (1 - Eb_val * Ec_val * I2))
     # Backward driving efficiency
@@ -172,7 +176,7 @@ def efficiency_calc(design_vals, target_z_r1 = TARG_zr1):
 
 '''
 Function 'score vals'
-takes:  in_vals (parameters to sweep) [5,1] list of  - [z_sh, z_r2, xs, xr2, Cl] OR [4,1] if add_cl is True.
+takes:  in_vals (parameters to sweep) [5,1] list of arrays - [z_sh, z_r2, xs, xr2, Cl] OR [4,1] if add_cl is True.
         add_gear - boolean whether to also add in the values from Matsuki 2019 paper
         add_cl - boolean whether to also add in set Cl values (False means they will be given)
 gives: score [scalar] - number of valid combinations
@@ -180,7 +184,7 @@ NOTE - for scores to be transferable, give the same size vectors across differen
 
 '''
 
-def score_vals(in_vals, add_gear = True, return_verbose = False):
+def score_vals(in_vals, add_gear = True, return_verbose = False, mu = MU):
 
     # print(in_vals)
 
@@ -196,7 +200,7 @@ def score_vals(in_vals, add_gear = True, return_verbose = False):
     # validated_design_vals = z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, r_a, I1, I2, gr_s, ratios
     validated_design_vals, I1, I2, gr_s, ratios = validate_parameters(in_vals)
 
-    eta_fwd, eta_bwd = efficiency_calc(validated_design_vals)
+    eta_fwd, eta_bwd = efficiency_calc(validated_design_vals, mu=mu)
 
     # composite_score = ratios * eta_fwd * eta_bwd # possibly useful in future ?
     bd_indices = np.where(eta_bwd > 0.3)
