@@ -180,7 +180,7 @@ NOTE - for scores to be transferable, give the same size vectors across differen
 
 '''
 
-def score_vals(in_vals, add_gear = True):
+def score_vals(in_vals, add_gear = True, return_verbose = False):
 
     # print(in_vals)
 
@@ -204,6 +204,8 @@ def score_vals(in_vals, add_gear = True):
     score = len(validated_design_vals[0][bd_indices]) # how many valid z_s (valid sets total)?
     gr_score = np.mean(ratios[bd_indices])*len(validated_design_vals[0][bd_indices]) # average gear ratio (among working) * number of valid z_s (valid sets)
     # print(f'Score compare: best - {best_score}, current - {score}')len(validated_design_vals[0][bd_indices])
+    if return_verbose:
+        return gr_score, validated_design_vals, eta_bwd, ratios
     return gr_score
 
 '''
