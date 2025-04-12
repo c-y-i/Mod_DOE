@@ -1,3 +1,7 @@
+"""
+Utility functions for the Wolfrom gear design optimization process.
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
@@ -275,3 +279,50 @@ def list_to_param(param_list, vals_per = 3):
                     param[naming[ind] + '_' + str(ind2)] = float(param_list[ind][ind2])
 
     return param
+
+def plot_efficiencies(data):
+    """
+    Creates a detailed 3D scatter plot of overall gear ratio, forward efficiency,
+    and backward efficiency.
+    Hovering over a dot displays detailed candidate information.
+    """
+    import warnings
+    warnings.filterwarnings("ignore", message="3d coordinates not supported", category=UserWarning)
+    
+    filtered = [d for d in data if d[7] > 0 and d[8] > 0]
+    if not filtered:
+        print("No valid data to plot.")
+        return
+
+    gear_ratios, fwd_effs, bwd_effs, labels = [], [], [], []
+    for d in filtered:
+        # candidate: (iteration, z_s, z_p1, z_r1, z_p2, z_r2, gear_ratio, eff_fwd, eff_bwd, composite)
+        itr, z_s, z_p1, z_r1, z_p2, z_r2, overall_ratio, eff_fwd, eff_bwd, _ = d
+        label = (f"Iteration: {itr}\n"
+                 f"Sun (z_s): {z_s}, Planet 1 (z_p1): {z_p1}, Ring 1 (z_r1): {z_r1}\n"
+                 f"Planet 2 (z_p2): {z_p2}, Ring 2 (z_r2): {z_r2}\n"
+                 f"Gear Ratio: 1:{overall_ratio:.2f}\n"
+                 f"Forward Eff: {eff_fwd*100:.2f}%\n"
+                 f"Backward Eff: {eff_bwd*100:.2f}%")
+        gear_ratios.append(overall_ratio)
+        fwd_effs.append(eff_fwd*100)
+        bwd_effs.append(eff_bwd*100)
+        labels.append(label)
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    sc = ax.scatter(gear_ratios, fwd_effs, bwd_effs, c=fwd_effs, cmap='viridis',
+                    edgecolor='k', alpha=0.8, s=60)
+    
+    ax.set_xlabel("Gear Ratio (1:ratio)")
+    ax.set_ylabel("Forward Efficiency (%)")
+    ax.set_zlabel("Backward Efficiency (%)")
+    ax.set_title("Detailed Efficiency Plot")
+    cursor = mplcursors.cursor(sc, hover=True)
+    @cursor.connect("add")
+    def on_add(sel):
+        index = sel.index
+        sel.annotation.set_text(labels[index])
+        sel.annotation.get_bbox_patch().set(fc="whitesmoke", alpha=0.9)
+    fig.colorbar(sc, label="Forward Efficiency (%)")
+    plt.show()
