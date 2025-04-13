@@ -35,13 +35,14 @@ TARG_xr1 = 0
 '''
 Function 'validate parameters'
 takes: in_vals (parameters to sweep) [5,n] - [z_sh, z_r2, xs, xr2, Cl]
+       offsets [2,n] - p1_offset, p2_offset (optional)
        target_z_r1 - target gears for ring 1 ()
        target_xr1 - target profile shift for ring 1 ()
 
 returns: design_vals: [z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, carrier]
          calculated values: I1, I2, gr_s, ratios
 '''
-def validate_parameters(in_vals, target_z_r1 = TARG_zr1, target_xr1 = TARG_xr1):
+def validate_parameters(in_vals, offsets = [0,0], target_z_r1 = TARG_zr1, target_xr1 = TARG_xr1):
 
     # Calculate all possible combinations of gear ratios
     z_sh, z_r2, xs, xr2, Cl = np.meshgrid(
@@ -65,13 +66,15 @@ def validate_parameters(in_vals, target_z_r1 = TARG_zr1, target_xr1 = TARG_xr1):
     eqn1 = (z_r1+2*xr1-z_s-2*xs)/2 - (Cl_1 + Cl_2)/MA
     # NOTE - the following is a restrictive design choice, mostly for convenience in CAD
     # and for reliably reconciling this equation.
-    z_p1 = np.floor(eqn1) 
+    p1_offset = offsets[0] # p1_offset
+    z_p1 = np.floor(eqn1) + p1_offset
     xp1 = (eqn1 - z_p1)/2 # limits xp1 between 0 and 0.5
 
     eqn2 = MA/MC*((z_p1+2*xp1) - (z_r1+2*xr1)) + (z_r2 + 2*xr2) + 2/MC*(Cl_2 - Cl_3)
     # NOTE - the following is a restrictive design choice, mostly for convenience in CAD
     # and for reliably reconciling this equation.
-    z_p2 = np.floor(eqn2)
+    p2_offset = offsets[1] # p2_offset
+    z_p2 = np.floor(eqn2) + p2_offset
     xp2 = (eqn2 - z_p2)/2 # limits xp2 between 0 and 0.5
 
     # solve r_a / r_b / r_c
@@ -188,7 +191,7 @@ NOTE - for scores to be transferable, give the same size vectors across differen
 
 '''
 
-def score_vals(in_vals, add_gear = True, return_verbose = False, mu = MU):
+def score_vals(in_vals, offsets = [0,0], add_gear = True, return_verbose = False, mu = MU, ):
 
     # print(in_vals)
 
@@ -202,7 +205,7 @@ def score_vals(in_vals, add_gear = True, return_verbose = False, mu = MU):
     # print(in_vals)
 
     # validated_design_vals = z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, r_a, I1, I2, gr_s, ratios
-    validated_design_vals, I1, I2, gr_s, ratios = validate_parameters(in_vals)
+    validated_design_vals, I1, I2, gr_s, ratios = validate_parameters(in_vals, offsets = offsets)
 
     eta_fwd, eta_bwd = efficiency_calc(validated_design_vals, mu=mu)
 
@@ -220,14 +223,18 @@ def score_vals(in_vals, add_gear = True, return_verbose = False, mu = MU):
 Function 'param_to_list'
 takes:  params - dictionary from Ax.dev detailing parameters
         add_cl - boolean whether to also add in set Cl values (False means they will be given)
+        w_offset - boolean whether the Ax values will include 2 offsets (p1_offset, p2_offset)
 gives: parm_list [5,n] list for use in score_vals  - [z_sh, z_r2, xs, xr2, Cl]
 
 '''
-def param_to_list(param, add_cl = False):
+def param_to_list(param, add_cl = False, w_offset = False):
+
+    num_param = 5 # default number of parameters
+    if w_offset:
+        num_param += 2
     if add_cl:
-        num_param = 4
-    else:
-        num_param = 5
+        num_param -= 1 # add in set Cl values
+
     each_val_len = len(param) // num_param # n = 3 parameters (usually)
 
     param_list = []
@@ -245,10 +252,10 @@ def param_to_list(param, add_cl = False):
     return param_list
 
 
-def list_to_param(param_list, vals_per = 3):
+def list_to_param(param_list, vals_per = 4):
     """
     Function 'list_to_param'
-    takes: param_list [5,1] list for use in score_vals - [z_sh, z_r2, xs, xr2, Cl]
+    takes: param_list [5,1] list for use in score_vals - [z_sh, z_r2, xs, xr2, Cl, p1_offset, p2_offset]
     gives: params - dictionary from Ax.dev detailing parameters
     """
 
@@ -256,6 +263,10 @@ def list_to_param(param_list, vals_per = 3):
         naming = ['z_sh', 'z_r2', 'xs', 'xr2']
     elif len(param_list) == 5:
         naming = ['z_sh', 'z_r2', 'xs', 'xr2', 'Cl']
+    elif len(param_list) == 6:
+        naming = ['z_sh', 'z_r2', 'xs', 'xr2', 'p1_offset', 'p2_offset']
+    elif len(param_list) == 7:
+        naming = ['z_sh', 'z_r2', 'xs', 'xr2', 'Cl', 'p1_offset', 'p2_offset']
 
 
     param = {}
