@@ -42,12 +42,22 @@ takes: in_vals (parameters to sweep) [5,n] - [z_sh, z_r2, xs, xr2, Cl]
 returns: design_vals: [z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, carrier]
          calculated values: I1, I2, gr_s, ratios
 '''
-def validate_parameters(in_vals, offsets = [0,0], target_z_r1 = TARG_zr1, target_xr1 = TARG_xr1):
+def validate_parameters(in_vals, offsets = None, target_z_r1 = TARG_zr1, target_xr1 = TARG_xr1):
 
     # Calculate all possible combinations of gear ratios
-    z_sh, z_r2, xs, xr2, Cl = np.meshgrid(
-        *in_vals, indexing='ij'
-    )
+    if offsets is not None:
+        in_vals.append(offsets[0])
+        in_vals.append(offsets[1])
+        z_sh, z_r2, xs, xr2, Cl, p1_offset, p2_offset = np.meshgrid(
+            *in_vals, indexing='ij'
+        )
+        p1_offset = p1_offset.flatten()
+        p2_offset = p2_offset.flatten()
+    else:   
+        z_sh, z_r2, xs, xr2, Cl = np.meshgrid(
+            *in_vals, indexing='ij'
+        )
+        p1_offset, p2_offset = 0, 0
 
     Cl = Cl.flatten()
 
@@ -66,14 +76,12 @@ def validate_parameters(in_vals, offsets = [0,0], target_z_r1 = TARG_zr1, target
     eqn1 = (z_r1+2*xr1-z_s-2*xs)/2 - (Cl_1 + Cl_2)/MA
     # NOTE - the following is a restrictive design choice, mostly for convenience in CAD
     # and for reliably reconciling this equation.
-    p1_offset = offsets[0] # p1_offset
     z_p1 = np.floor(eqn1) + p1_offset
     xp1 = (eqn1 - z_p1)/2 # limits xp1 between 0 and 0.5
 
     eqn2 = MA/MC*((z_p1+2*xp1) - (z_r1+2*xr1)) + (z_r2 + 2*xr2) + 2/MC*(Cl_2 - Cl_3)
     # NOTE - the following is a restrictive design choice, mostly for convenience in CAD
     # and for reliably reconciling this equation.
-    p2_offset = offsets[1] # p2_offset
     z_p2 = np.floor(eqn2) + p2_offset
     xp2 = (eqn2 - z_p2)/2 # limits xp2 between 0 and 0.5
 
@@ -96,6 +104,7 @@ def validate_parameters(in_vals, offsets = [0,0], target_z_r1 = TARG_zr1, target
     # z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2 = z_s[valid_combinations], z_p1[valid_combinations], z_p2[valid_combinations], z_r2[valid_combinations], xs[valid_combinations], xp1[valid_combinations], xp2[valid_combinations], xr2[valid_combinations]
     # I1, I2, gr_s, ratios = I1[valid_combinations], I2[valid_combinations], gr_s[valid_combinations], ratios[valid_combinations]
 
+    # print(f'Shapes: {z_s.shape}, {z_p1.shape}, {z_p2.shape}, {z_r2.shape}, {xs.shape}, {xp1.shape}, {xp2.shape}, {xr2.shape}, {ratios.shape}')
     assert z_s.shape == z_p1.shape == z_p2.shape == z_r2.shape == xs.shape == xp1.shape == xp2.shape == xr2.shape == ratios.shape
 
     z_sh = z_s / 2 # convert back to z_s / 2 for output
@@ -191,7 +200,7 @@ NOTE - for scores to be transferable, give the same size vectors across differen
 
 '''
 
-def score_vals(in_vals, offsets = [0,0], add_gear = True, return_verbose = False, mu = MU, ):
+def score_vals(in_vals, offsets = None, add_gear = True, return_verbose = False, mu = MU, ):
 
     # print(in_vals)
 
@@ -199,6 +208,7 @@ def score_vals(in_vals, offsets = [0,0], add_gear = True, return_verbose = False
     paper_vals = [6, 81, .476, 1.0, 0.1e-3, 0, 0] # NOTE - 6 = 12 (z_s) / 2. 1.0 is as close as we can get to x_r2 = 1.2
 
     if add_gear:
+        print(f'We\'re adding a gear')
         for i in range(len(in_vals)):
             in_vals[i] = np.hstack([in_vals[i], paper_vals[i]])
 
@@ -227,11 +237,9 @@ takes:  params - dictionary from Ax.dev detailing parameters
 gives: parm_list [5,n] list for use in score_vals  - [z_sh, z_r2, xs, xr2, Cl]
 
 '''
-def param_to_list(param, add_cl = False, w_offset = False):
+def param_to_list(param, add_cl = False, add_offset = False):
 
     num_param = 5 # default number of parameters
-    if w_offset:
-        num_param += 2
     if add_cl:
         num_param -= 1 # add in set Cl values
 
@@ -243,13 +251,16 @@ def param_to_list(param, add_cl = False, w_offset = False):
     
     if add_cl:
         # add in set Clearance values
-        if each_val_len == 3:
-            set_Cl = np.array([0.2e-3, 0.3e-3, 0.4e-3])
+        if each_val_len == 3: # should be deprecated.
+            set_Cl = np.array([0, 0.2e-3, 0.3e-3])
         elif each_val_len == 4:
-            set_Cl = np.array([0.1e-3, 0.2e-3, 0.3e-3, 0.4e-3])
+            set_Cl = np.array([0, 0.1e-3, 0.2e-3, 0.3e-3])
         param_list.append(set_Cl)
-
-    return param_list
+    if add_offset:
+        offsets = np.array([[-1, 0, 1, 2],[-1, 0, 1, 2]])
+        return param_list, offsets
+    else:
+        return param_list
 
 
 def list_to_param(param_list, vals_per = 4):
