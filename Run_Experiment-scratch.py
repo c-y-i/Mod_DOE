@@ -225,7 +225,7 @@ while(1):
         # Read current
         in_state = read_state(esp_serial, baud_rate=esp_baud, expected_len=2)
         try:
-            in_current = float(in_state[1][:-3])
+            in_current = float(in_state[1][:-3]) #get rid of 'mA' label
         except:
             in_current = 0
         # append
