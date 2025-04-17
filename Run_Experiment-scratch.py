@@ -37,12 +37,12 @@ import datetime                                # Import datetime
 import pickle                                  # Import pickle
 
 # ESP32 Pico D4 features
-esp_serial = '/dev/ttyUSB1'
+esp_serial = '/dev/ttyUSB0' # CHECK - may be 0 or 1
 esp_baud = 115200
 
 # Dictionary details
 dict_file = 'test_dict.pkl'
-in_num = 2
+in_num = 393
 
 #############################################################################
 # Dynamixel Features
@@ -66,7 +66,7 @@ PROTOCOL_VERSION            = 2.0               # See which protocol version is 
 # Default setting
 DXL_ID                      = 35                # Dynamixel ID : 1
 BAUDRATE                    = 3000000           # Dynamixel default baudrate : 57600
-DEVICENAME                  = '/dev/ttyUSB0'    # Check which port is being used on your controller
+DEVICENAME                  = '/dev/ttyUSB1'    # Check which port is being used on your controller
                                                 # ex) Windows: "COM1"   Linux: "/dev/ttyUSB0" Mac: "/dev/tty.usbserial-*"
 
 TORQUE_ENABLE               = 1                 # Value for enabling the torque
@@ -223,11 +223,14 @@ while(1):
         load = int(dxl_read_address(ADDR_MX_PRESENT_LOAD))
 
         # Read current
-        in_state = read_state(esp_serial, baud_rate=esp_baud, expected_len=2)
+        in_state = read_state(esp_serial, baud_rate=esp_baud, expected_len=1) #4/17 update to len 1
         try:
-            in_current = float(in_state[1][:-3]) #get rid of 'mA' label
+            # in_current = float(in_state[1][:-3]) #get rid of 'mA' label
+            in_current = float(in_state[0][2:]) #HACK - get rid of b'
+            # print(in_current)
         except:
-            in_current = 0
+            # print("Error reading current")        print(in_state[0][2:]
+            in_current = -1
         # append
         dxl_inputs = np.vstack((dxl_inputs,[int((time.time()-start_time)*1000),load]))
         esp_inputs = np.vstack((esp_inputs,[in_current]))
@@ -260,6 +263,7 @@ if key_name in dict_set.keys():
     dict_set[key_name].append(all_inputs)
 else:
     dict_set[key_name] = [all_inputs] # save as a list
+    print("Key does not exist, creating new key")
 pickle.dump(dict_set, open(dict_file, "wb"))
 
 

@@ -63,8 +63,9 @@ Note: unclear if the 'str_line[2:-3]' is necessary, but it is used in the origin
 Re Note: the -3 is to deal with '0\\n' - easier to just use values[-1] = values[-1][0]
 """
 def parse_string(string):
-    str_line = str(string)
+    str_line = str(string.strip())
     # str_line = str_line[2:-3]
+    # values = list(map(str.strip, str_line.split(',')))
     values = list(map(str.strip, str_line.split(',')))
     return values
 
@@ -102,8 +103,8 @@ def read_state(serial_port, baud_rate=115200, expected_len = 7):
         # Print the contents of the serial data
         if(not serialString == b''):
             try:
-                str_line = str(serialString)
-                values = parse_string(str_line)
+                # str_line = str(serialString)
+                values = parse_string(serialString)
                 if len(values) > expected_len:
                     serialPort.close()
                     flush(serial_port, baud_rate)
@@ -111,8 +112,8 @@ def read_state(serial_port, baud_rate=115200, expected_len = 7):
                 else:
                     #try 1 more time
                     serialString = serialPort.readline()
-                    str_line = str(serialString)
-                    values = parse_string(str_line)
+                    # str_line = str(serialString)
+                    values = parse_string(serialString)
                     flush(serial_port, baud_rate)
                     serialPort.close()
                     return values

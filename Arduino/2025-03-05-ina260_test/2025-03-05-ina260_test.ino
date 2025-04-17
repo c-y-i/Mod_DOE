@@ -17,10 +17,10 @@ void setup() {
 }
 
 void loop() {
-  Serial.print("Current: ");
-  Serial.print(ina260.readCurrent());
-  Serial.println(" mA");
-
+  // Serial.print("Current: ");
+  Serial.println(ina260.readCurrent()); //mA
+  // Serial.println(" mA");
+// 
 //  Serial.print("Bus Voltage: ");
 //  Serial.print(ina260.readBusVoltage());
 //  Serial.println(" mV");
@@ -30,5 +30,5 @@ void loop() {
   //Serial.println(" mW");
 
   //Serial.println();
-  delay(10);
+  delay(5);
 }
