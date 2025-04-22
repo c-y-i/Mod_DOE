@@ -8,6 +8,7 @@ Define functions for serial communications.
 # imports
 import serial
 import time
+import re
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Old commands (to delete)
@@ -62,12 +63,17 @@ return: A list of strings.
 Note: unclear if the 'str_line[2:-3]' is necessary, but it is used in the original code. Altered for leg lifts 9/17/24.
 Re Note: the -3 is to deal with '0\\n' - easier to just use values[-1] = values[-1][0]
 """
-def parse_string(string):
-    str_line = str(string.strip())
-    # str_line = str_line[2:-3]
-    # values = list(map(str.strip, str_line.split(',')))
-    values = list(map(str.strip, str_line.split(',')))
-    return values
+def parse_string(string, float_only = False):
+    if float_only:
+        matches = re.findall(r"[-+]?\d*\.\d+|\d+", string)
+        float_vals = [float(match) for match in matches]
+        return float_vals
+    else:
+        str_line = str(string.strip())
+        # str_line = str_line[2:-3]
+        # values = list(map(str.strip, str_line.split(',')))
+        values = list(map(str.strip, str_line.split(',')))
+        return values
 
 """
 Flush the serial port buffer.
@@ -95,30 +101,35 @@ def read_state(serial_port, baud_rate=115200, expected_len = 7):
         port=serial_port, baudrate=baud_rate, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE
     )
 
-    time.sleep(0.005)
+    start_time = time.time()
 
-    if serialPort.in_waiting > 0:
-        # Read data out of the buffer until a carraige return / new line is found
-        serialString = serialPort.readline()
-        # Print the contents of the serial data
-        if(not serialString == b''):
-            try:
-                # str_line = str(serialString)
-                values = parse_string(serialString)
-                if len(values) > expected_len:
-                    serialPort.close()
-                    flush(serial_port, baud_rate)
-                    return values
-                else:
-                    #try 1 more time
-                    serialString = serialPort.readline()
+    # read for at least 5ms
+    while (time.time()-start_time < 0.005):
+
+        if serialPort.in_waiting > 0:
+            # Read data out of the buffer until a carraige return / new line is found
+            serialString = serialPort.readline()
+            # Print the contents of the serial data
+            if(not serialString == b''):
+                try:
                     # str_line = str(serialString)
-                    values = parse_string(serialString)
-                    flush(serial_port, baud_rate)
-                    serialPort.close()
-                    return values
-            except:
-                return 0
+                    values = parse_string(serialString, float_only=False)
+                    if len(values) >= expected_len:
+                        serialPort.close()
+                        # flush(serial_port, baud_rate)
+                        return values
+                    else:
+                        #try 1 more time
+                        serialString = serialPort.readline()
+                        # str_line = str(serialString)
+                        values = parse_string(serialString)
+                        # flush(serial_port, baud_rate)
+                        serialPort.close()
+                        return values
+                except:
+                    pass
+    return 0 # if failed.
+
 
 """
 Read the height from the serial port for a specified amount of time.
@@ -135,7 +146,7 @@ def read_state_for(read_time, serial_port, baud_rate=115200, expected_len = 7):
     serialPort = serial.Serial(
         port=serial_port, baudrate=baud_rate, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE
     )
-    time.sleep(0.1)
+    time.sleep(0.005)
 
     # read the serial port for x seconds
     try:

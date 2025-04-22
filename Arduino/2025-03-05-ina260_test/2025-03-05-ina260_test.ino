@@ -13,11 +13,15 @@ void setup() {
     Serial.println("Couldn't find INA260 chip");
     while (1);
   }
+  long start_time = millis();
   Serial.println("Found INA260 chip");
 }
 
 void loop() {
+  long this_time = millis();
   // Serial.print("Current: ");
+  Serial.print(this_time - start_time);
+  Serial.print(", ");
   Serial.println(ina260.readCurrent()); //mA
   // Serial.println(" mA");
 // 

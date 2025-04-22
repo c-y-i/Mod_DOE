@@ -35,14 +35,16 @@ import numpy as np                             # Import numpy
 import csv                                     # Import csv 
 import datetime                                # Import datetime
 import pickle                                  # Import pickle
+import threading                              # Import threading
+from queue import Queue                   # Import queue
 
 # ESP32 Pico D4 features
 esp_serial = '/dev/ttyUSB0' # CHECK - may be 0 or 1
 esp_baud = 115200
 
 # Dictionary details
-dict_file = 'test_dict.pkl'
-in_num = 393
+dict_file = 'v2_test_dict.pkl'
+in_num = 1
 
 #############################################################################
 # Dynamixel Features
@@ -170,6 +172,35 @@ def dxl_read_address(ADDR, portHandler = portHandler, packetHandler = packetHand
         print("Position ERROR %s" % packetHandler.getRxPacketError(dxl_error))
     return dxl_address_value
 
+# Read current from ESP32 serial
+def read_current(q, serial_port, baud_rate=115200):
+    current_vals = []
+    timestamp = []
+    init_time = time.time()
+    while(RECORD_BOOL):
+        in_current = -1
+        while in_current == -1:
+            with serial.Serial(port=esp_serial, baudrate=esp_baud, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE) as ser:
+                line = ser.readline().decode('utf-8').rstrip()
+                if line:
+                    value = parse_string(line, float_only=True)[0]
+                    if value is not None:
+                        in_current = value
+        current_vals.append(in_current)
+        timestamp.append(int((time.time()-init_time)*1000))
+    print(f'Posting current vals, shape: {len(current_vals)}')
+    q.put( [timestamp, current_vals] )
+
+def dxl_read_loads(q):
+    load_vals = []
+    timestamp = []
+    init_time = time.time()
+    while(RECORD_BOOL):
+        load = int(dxl_read_address(ADDR_MX_PRESENT_LOAD))
+        load_vals.append(load)
+        timestamp.append(int((time.time()-init_time)*1000))
+    print(f'Posting load vals, shape: {len(load_vals)}')
+    q.put( [timestamp, load_vals] )
 
 #################################################
 # Main Loop
@@ -198,9 +229,6 @@ else:
 dxl_set_Control('wheel')
 dxl_set_Torque_enable(True)
 
-# flush serial buffer
-flush(esp_serial, baud_rate=esp_baud)
-
 # create an empty array
 dxl_inputs = np.zeros([0,2]).astype(int)
 esp_inputs = np.zeros([0,1]).astype(int)
@@ -209,35 +237,38 @@ while(1):
     print("Press any key to continue! (or press ESC to quit!)")
     if getch() == chr(0x1b):
         break
+    
+    # use a Queue for thread-safe communication
+    output_queue = Queue()
+
+    thread_current = threading.Thread(target=read_current, args=(output_queue, esp_serial, esp_baud))
+    thread_dxl = threading.Thread(target=dxl_read_loads, args=(output_queue,))
+
+    RECORD_BOOL = True
+    # Start threads
+    thread_current.start()
 
     # # Write goal speed
     dxl_set_LED(True)
     dxl_move_speed(SPEED[index])
     start_time = time.time()
+
+    thread_dxl.start()
+
+    # Wait for run
     while(time.time()-start_time < 2):
-        # Too slow to read speed & position as well (~15ms per read (!!))
-        # speed = dxl_read_address(ADDR_MX_PRESENT_SPEED)
-        # pos = dxl_read_address(ADDR_MX_PRESENT_POSITION)
+        pass
 
-        # Read load
-        load = int(dxl_read_address(ADDR_MX_PRESENT_LOAD))
-
-        # Read current
-        in_state = read_state(esp_serial, baud_rate=esp_baud, expected_len=1) #4/17 update to len 1
-        try:
-            # in_current = float(in_state[1][:-3]) #get rid of 'mA' label
-            in_current = float(in_state[0][2:]) #HACK - get rid of b'
-            # print(in_current)
-        except:
-            # print("Error reading current")        print(in_state[0][2:]
-            in_current = -1
-        # append
-        dxl_inputs = np.vstack((dxl_inputs,[int((time.time()-start_time)*1000),load]))
-        esp_inputs = np.vstack((esp_inputs,[in_current]))
-        # print("Speed: %d, Position: %d, Load: %d" % (speed, pos, load))
+    RECORD_BOOL = False
+    thread_dxl.join()
+    dxl_inputs = output_queue.get()
 
     dxl_set_LED(False)
     dxl_move_speed(STOP)
+
+    # turn off RECORD_BOOL and collect results
+    thread_current.join()
+    esp_inputs = output_queue.get()
 
     # Change goal position
     if index == 0:
@@ -249,7 +280,7 @@ dxl_set_Torque_enable(False)
 
 portHandler.closePort()
 
-all_inputs = np.hstack((dxl_inputs,esp_inputs))
+all_inputs = [dxl_inputs,esp_inputs]
 
 # add to existing dictionary
 key_name = 'test' + str(in_num)
