@@ -234,7 +234,7 @@ def read_current(q, serial_port, baud_rate=esp_baud):
 ##############################################
 # Plotting Function
 ##############################################
-def plot_dict_key(in_dict, dict_key):
+def plot_dict_key(in_dict, dict_key, save_loc = None, file_name = None):
     fig = plt.figure()
     # 2 subplots
     ax = fig.add_subplot(1, 2, 1)
@@ -278,6 +278,10 @@ def plot_dict_key(in_dict, dict_key):
     ax2.set_ylim([current_ll, current_ul])
 
     plt.tight_layout()
+    if save_loc and file_name:
+        save_path = f"{save_loc}/{file_name}"
+        plt.savefig(save_path)  # Save the figure to the specified location
+
     plt.show()
 
 #################################################
