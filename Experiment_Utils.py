@@ -207,7 +207,11 @@ def read_current(q, serial_port, baud_rate=esp_baud):
 
     current_vals = []
     for row in raw:
-        line = row.decode('utf-8').rstrip()
+        try:
+            line = row.decode('utf-8').rstrip()
+        except:
+            current_vals.append(-1)
+            continue
         try:
             value = parse_string(line, float_only=True)[1]
             current_vals.append(value)
