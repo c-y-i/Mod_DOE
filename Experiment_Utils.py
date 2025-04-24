@@ -463,7 +463,10 @@ def read_pressure(q, serial_port, baud_rate=esp_baud):
     with serial.Serial(port=serial_port, baudrate=baud_rate, bytesize=8) as ser:
         while(valve_rec_bool):
             if ser.in_waiting > 0:
-                line = ser.readline()
+                try:
+                    line = ser.readline()
+                except:
+                    continue
                 # if line:
                 raw.append(line)
                 timestamp.append(int((time.time()-init_time)*1000))
