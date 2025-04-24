@@ -11,25 +11,9 @@ import time
 import re
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Old commands (to delete)
+# Commands
 AIR_PUMP_ON = 'w\n'.encode()
 AIR_PUMP_OFF = 's\n'.encode()
-AIR_RELEASE_ON = 'q\n'.encode()
-AIR_RELEASE_OFF = 'a\n'.encode()
-L_LIN_PUSH = 'u\n'.encode()
-L_LIN_PULL = 'i\n'.encode()
-L_LIN_STOP = 'o\n'.encode()
-R_LIN_PUSH = 'j\n'.encode()
-R_LIN_PULL = 'k\n'.encode()
-R_LIN_STOP = 'l\n'.encode()
-BOTH_PUSH = 'y\n'.encode()
-BOTH_STOP = 'h\n'.encode()
-BOTH_PULL = 'n\n'.encode()
-SENSOR_POWER_ON = '9\n'.encode()
-SENSOR_POWER_OFF= '0\n'.encode()
-
-# New commands
-RESET_ESP = 'm\n'.encode()
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Function definitions

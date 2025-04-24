@@ -45,12 +45,13 @@ esp_serial = '/dev/ttyUSB0' # CHECK - may be 0 or 1
 # esp_baud = 115200
 esp_baud = 500_000 #ESP default baudrate : 115200
 
-# Dictionary details
+# Dictionary details TODO - check and delete.
 dict_file = 'v2_test_dict.pkl'
 in_num = 1
 
-# file variable for recording
-rec_bool = True
+# file variables for recording
+gear_rec_bool = True
+valve_rec_bool = True
 
 #############################################################################
 # Dynamixel Features
@@ -183,7 +184,7 @@ def dxl_read_loads(q):
     load_vals = []
     timestamp = []
     init_time = time.time()
-    while(rec_bool):
+    while(gear_rec_bool):
         load = int(dxl_read_address(ADDR_MX_PRESENT_LOAD))
         load_vals.append(load)
         timestamp.append(int((time.time()-init_time)*1000))
@@ -196,8 +197,8 @@ def read_current(q, serial_port, baud_rate=esp_baud):
     timestamp = []
     init_time = time.time()
     loop_count = 0
-    with serial.Serial(port=esp_serial, baudrate=esp_baud, bytesize=8) as ser:
-        while(rec_bool):
+    with serial.Serial(port=serial_port, baudrate=baud_rate, bytesize=8) as ser:
+        while(gear_rec_bool):
             if ser.in_waiting > 0:
                 line = ser.readline()
                 # if line:
@@ -213,7 +214,7 @@ def read_current(q, serial_port, baud_rate=esp_baud):
             current_vals.append(-1)
             continue
         try:
-            value = parse_string(line, float_only=True)[1]
+            value = parse_string(line, float_only=True)[1] # 2 columns should be time, pressure
             current_vals.append(value)
         except:
             value = parse_string(line, float_only=True)
@@ -284,8 +285,46 @@ def plot_dict_key(in_dict, dict_key, save_loc = None, file_name = None):
 
     plt.show()
 
+def valve_plot_dict_key(in_dict, dict_key, save_loc = None, file_name = None):
+    fig = plt.figure()
+    # 1 subplot (for now)
+    ax = fig.add_subplot(1, 1, 1)
+
+    n = len(in_dict[dict_key])
+
+    # set up colors
+    base_c1 = cm.Reds
+    base_c2 = cm.Blues
+    color1 = [base_c1(i / n) for i in range(n)]
+    color2 = [base_c2(i / n) for i in range(n)]
+
+    # plot all the trials
+    p1_all_vals = []
+    for i in range(n):
+        p1_time = np.array(in_dict[dict_key][i][0])
+        p1_vals = np.array(in_dict[dict_key][i][1])
+
+        ax.scatter(p1_time, p1_vals, c=color1[i], label='pressure')
+        p1_all_vals.extend(p1_vals)
+
+    ax.set_xlabel('time (ms)')
+    ax.set_ylabel('p1 pressure (kPa)')
+    # ax2.set_xlabel('time (ms)')
+    # ax2.set_ylabel('p2 pressure (kPa)')
+    p1_ll = np.percentile(p1_all_vals, 1)
+    p1_ul = np.percentile(p1_all_vals, 99)
+
+    ax.set_ylim([p1_ll, p1_ul])
+
+    plt.tight_layout()
+    if save_loc and file_name:
+        save_path = f"{save_loc}/{file_name}"
+        plt.savefig(save_path)  # Save the figure to the specified location
+
+    plt.show()
+
 #################################################
-# Main Loop
+# Run **Gear** Experiment - Main Function
 #################################################
 
 def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_dir = None, file_name = None, save = True):
@@ -298,7 +337,8 @@ def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_
     # Set control type
     # Open port
     if portHandler.openPort():
-        print("Succeeded to open the port")
+        # print("Succeeded to open the port")
+        pass
     else:
         print("Failed to open the port")
         # print("Press any key to terminate...")
@@ -308,7 +348,8 @@ def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_
 
     # Set port baudrate
     if portHandler.setBaudRate(BAUDRATE):
-        print("Succeeded to change the baudrate")
+        # print("Succeeded to change the baudrate")
+        pass
     else:
         print("Failed to change the baudrate")
         # print("Press any key to terminate...")
@@ -319,10 +360,11 @@ def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_
     dxl_set_Control('wheel')
     dxl_set_Torque_enable(True)
 
-    # create an empty array
+    # create an empty array - TODO - delete?
     dxl_inputs = np.zeros([0,2]).astype(int)
     esp_inputs = np.zeros([0,1]).astype(int)
 
+    ## Section for getch() control (doesn't work for function call)
     # while(1):
     #     print("Press any key to continue! (or press ESC to quit!)")
     #     if getch() == chr(0x1b):
@@ -336,8 +378,8 @@ def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_
     thread_current = threading.Thread(target=read_current, args=(output_queue, esp_serial, esp_baud))
     thread_dxl = threading.Thread(target=dxl_read_loads, args=(output_queue,))
 
-    global rec_bool 
-    rec_bool = True
+    global gear_rec_bool 
+    gear_rec_bool = True
     # Start threads
     thread_current.start()
 
@@ -352,14 +394,14 @@ def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_
     while(time.time()-start_time < RUNTIME):
         pass
 
-    rec_bool = False
+    gear_rec_bool = False
     thread_dxl.join()
     read_queue1 = output_queue.get()
 
     dxl_set_LED(False)
     dxl_move_speed(STOP)
 
-    # turn off rec_bool and collect results
+    # turn off gear_rec_bool and collect results
     thread_current.join()
     read_queue2 = output_queue.get()
 
@@ -408,3 +450,103 @@ def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_
     # shape : [mxn,mxn,mxn,mxn ... ] - m is number of TRIALS (... is number of reported values)
         # concatenate over m trials - > [nx1,nx1,nx1,nx1] (samples)
             # report single value: [1,0] - cost (i.e. max(current))
+
+################################################
+# Pressure sensor helper function
+################################################
+# Read pressure (multiple pressures later?) from ESP32 serial, return to queue 'q'
+def read_pressure(q, serial_port, baud_rate=esp_baud):
+    raw = []
+    timestamp = []
+    init_time = time.time()
+    loop_count = 0
+    with serial.Serial(port=serial_port, baudrate=baud_rate, bytesize=8) as ser:
+        while(valve_rec_bool):
+            if ser.in_waiting > 0:
+                line = ser.readline()
+                # if line:
+                raw.append(line)
+                timestamp.append(int((time.time()-init_time)*1000))
+            loop_count += 1
+
+    pressure_vals = []
+    for row in raw:
+        try:
+            line = row.decode('utf-8').rstrip()
+        except:
+            pressure_vals.append(-1)
+            continue
+        try:
+            value = parse_string(line, float_only=True)[0]
+            pressure_vals.append(value)
+        except:
+            value = parse_string(line, float_only=True)
+            if len(value):
+                try:
+                    pressure_vals.append(value)
+                except:
+                    pressure_vals.append(-1)
+            else:
+                pressure_vals.append(-1)
+        
+
+    print(f'Posting pressure vals, shape: {len(pressure_vals)}')
+    q.put( [timestamp, pressure_vals] )
+
+
+#################################################
+# Valve Experiment - Main Function
+#################################################
+
+def Valve_Experiment(in_dict, RUNTIME = 2, in_key = 'test', file_dir = None, file_name = None, save = True):
+
+    print(f'Running pump for {RUNTIME} seconds ...')
+
+    # use a Queue for thread-safe communication
+    valve_queue = Queue()
+
+    thread_pressure = threading.Thread(target=read_pressure, args=(valve_queue, esp_serial, esp_baud))
+
+    # Start recording
+    global valve_rec_bool 
+    valve_rec_bool = True
+    # Start thread
+    thread_pressure.start()
+
+    # Start the pump
+    start_time = time.time()
+    send_character(esp_serial, esp_baud, AIR_PUMP_ON)
+
+    # Wait for run
+    while(time.time()-start_time < RUNTIME):
+        pass
+
+    # Stop the pump
+    send_character(esp_serial, esp_baud, AIR_PUMP_OFF)
+
+    # Record the data
+    valve_rec_bool = False
+    thread_pressure.join()
+    input = valve_queue.get()
+
+    # add to existing dictionary
+    key_name = in_key
+    dict_set = in_dict
+
+    # see if key exists
+    if key_name in dict_set.keys():
+        print("Key exists, appending")
+        dict_set[key_name].append(input)
+    else:
+        dict_set[key_name] = [input] # save as a list
+        print("Key does not exist, creating new key")
+
+    # save if necessary
+    if save and file_dir and file_name:
+        init_dir = os.getcwd()
+        os.chdir(file_dir)
+        pickle.dump(dict_set, open(file_name, "wb"))
+        os.chdir(init_dir)
+
+    return dict_set
+
