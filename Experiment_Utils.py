@@ -132,7 +132,8 @@ def dxl_move_position(position,portHandler = portHandler, packetHandler = packet
     return
 
 # Set control type - joint/wheel/multiturn
-def dxl_set_Control(control,portHandler = portHandler, packetHandler = packetHandler, DXL_ID = DXL_ID, CW_ANGLE_LIMIT = CW_ANGLE_LIMIT, CCW_ANGLE_LIMIT = CCW_ANGLE_LIMIT):
+# As potential first communication - this function has a return_error
+def dxl_set_Control(control,portHandler = portHandler, packetHandler = packetHandler, DXL_ID = DXL_ID, CW_ANGLE_LIMIT = CW_ANGLE_LIMIT, CCW_ANGLE_LIMIT = CCW_ANGLE_LIMIT, return_error = False):
     # Set CW & CCW Limit to 0 (for continuous rotation)
     if control == 'joint':
         CW_VAL = 1
@@ -145,21 +146,30 @@ def dxl_set_Control(control,portHandler = portHandler, packetHandler = packetHan
         CCW_VAL = 4095
     else:
         print("Invalid control type")
-        return
-
+        if return_error:
+            return True
+        else:
+            return
+    
+    error_bool = False
     dxl_comm_result, dxl_error = packetHandler.write2ByteTxRx(portHandler, DXL_ID, CW_ANGLE_LIMIT, CW_VAL)
     if dxl_comm_result != COMM_SUCCESS:
         print("%s" % packetHandler.getTxRxResult(dxl_comm_result))
     elif dxl_error != 0:
         print("%s" % packetHandler.getRxPacketError(dxl_error))
+        error_bool = True
 
     dxl_comm_result, dxl_error = packetHandler.write2ByteTxRx(portHandler, DXL_ID, CCW_ANGLE_LIMIT, CCW_VAL)
     if dxl_comm_result != COMM_SUCCESS:
         print("%s" % packetHandler.getTxRxResult(dxl_comm_result))
     elif dxl_error != 0:
         print("%s" % packetHandler.getRxPacketError(dxl_error))
-    return
+        error_bool = True
 
+    if return_error:
+        return error_bool
+    else:
+        return 
 # Enable Dynamixel Torque
 def dxl_set_Torque_enable(on_off_bool, portHandler = portHandler, packetHandler = packetHandler, DXL_ID = DXL_ID, ADDR_MX_TORQUE_ENABLE = ADDR_MX_TORQUE_ENABLE):
     dxl_comm_result, dxl_error = packetHandler.write1ByteTxRx(portHandler, DXL_ID, ADDR_MX_TORQUE_ENABLE, on_off_bool)
