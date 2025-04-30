@@ -24,7 +24,7 @@ param serial_port: The serial port to which the test rig controller is connected
 param baud_rate: The baud rate of the serial connection.
 param character: The command to be sent to the test setup.
 """
-def send_character(serial_port, baud_rate=115200, character='\n'.encode()):
+def send_character(serial_port, baud_rate=115200, character='\n'.encode(), return_error = False):
     try:
         ser = serial.Serial(serial_port, baud_rate, timeout=1)
         
@@ -36,9 +36,14 @@ def send_character(serial_port, baud_rate=115200, character='\n'.encode()):
         ser.close()
         
         time.sleep(0.02)
+
+        if return_error:
+            return False
         
     except serial.SerialException as e:
         print(f"An error occurred: {e}")
+        if return_error:
+            return True
 
 """
 Take in a string and return a list of strings

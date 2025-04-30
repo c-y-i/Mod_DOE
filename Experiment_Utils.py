@@ -336,14 +336,14 @@ def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_
     
     # Set control type
     # Open port
-    if portHandler.openPort():
-        # print("Succeeded to open the port")
-        pass
-    else:
-        print("Failed to open the port")
-        # print("Press any key to terminate...")
-        # getch()
-        quit()
+    try:
+        dxl_success =  portHandler.openPort()
+    except:
+        print("Failed to open the dxl port - try reconnecting USB's.")
+        return
+    if not dxl_success:
+        print("Failed to open the dxl port - try reconnecting USB's.")
+        return
 
 
     # Set port baudrate
@@ -354,7 +354,7 @@ def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_
         print("Failed to change the baudrate")
         # print("Press any key to terminate...")
         # getch()
-        quit()
+        return
 
     # Use continuous motion mode
     dxl_set_Control('wheel')
@@ -391,8 +391,24 @@ def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_
     thread_dxl.start()
 
     # Wait for run
-    while(time.time()-start_time < RUNTIME):
-        pass
+    try:
+        while(time.time()-start_time < RUNTIME):
+            pass
+
+    except KeyboardInterrupt:
+        print("Kernel interrupted! Stopping the function.")
+        # Perform any cleanup if necessary
+        dxl_set_LED(False)
+        dxl_move_speed(STOP)
+        dxl_set_Torque_enable(False)
+        portHandler.closePort()
+
+        gear_rec_bool = False
+        if thread_current.is_alive():
+            thread_current.join()
+        if thread_dxl.is_alive():
+            thread_dxl.join()
+        return
 
     gear_rec_bool = False
     thread_dxl.join()
@@ -460,17 +476,22 @@ def read_pressure(q, serial_port, baud_rate=esp_baud):
     timestamp = []
     init_time = time.time()
     loop_count = 0
-    with serial.Serial(port=serial_port, baudrate=baud_rate, bytesize=8) as ser:
-        while(valve_rec_bool):
-            if ser.in_waiting > 0:
-                try:
-                    line = ser.readline()
-                except:
-                    continue
-                # if line:
-                raw.append(line)
-                timestamp.append(int((time.time()-init_time)*1000))
-            loop_count += 1
+    try:
+        with serial.Serial(port=serial_port, baudrate=baud_rate, bytesize=8) as ser:
+            while(valve_rec_bool):
+                if ser.in_waiting > 0:
+                    try:
+                        line = ser.readline()
+                    except:
+                        continue
+                    # if line:
+                    raw.append(line)
+                    timestamp.append(int((time.time()-init_time)*1000))
+                loop_count += 1
+    except:
+        print(f'Unable to read Serial Input.')
+        valve_error_bool = True
+        return
 
     pressure_vals = []
     for row in raw:
@@ -512,17 +533,39 @@ def Valve_Experiment(in_dict, RUNTIME = 2, in_key = 'test', file_dir = None, fil
 
     # Start recording
     global valve_rec_bool 
+    global valve_error_bool
     valve_rec_bool = True
+    valve_error_bool = False
     # Start thread
     thread_pressure.start()
 
     # Start the pump
     start_time = time.time()
-    send_character(esp_serial, esp_baud, AIR_PUMP_ON)
+
+    send_error = send_character(esp_serial, esp_baud, AIR_PUMP_ON, return_error=True)
+    if send_error:
+        print(f'Failed communication with Microcontroller. Stopping Script.')
+        return
 
     # Wait for run
-    while(time.time()-start_time < RUNTIME):
-        pass
+    try:
+        while(time.time()-start_time < RUNTIME):
+            if valve_error_bool:
+                print(f'Error occured! Stopping the function.')
+                send_character(esp_serial, esp_baud, AIR_PUMP_OFF)  # Ensure the pump is stopped
+                valve_rec_bool = False
+                if thread_pressure.is_alive():
+                    thread_pressure.join()
+                return
+            else:
+                pass
+    except KeyboardInterrupt:
+        print("Kernel interrupted! Stopping the function.")
+        # Perform any cleanup if necessary
+        send_character(esp_serial, esp_baud, AIR_PUMP_OFF)  # Ensure the pump is stopped
+        valve_rec_bool = False
+        if thread_pressure.is_alive():
+            thread_pressure.join()
 
     # Stop the pump
     send_character(esp_serial, esp_baud, AIR_PUMP_OFF)
