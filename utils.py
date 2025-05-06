@@ -348,3 +348,38 @@ def plot_efficiencies(data):
         sel.annotation.get_bbox_patch().set(fc="whitesmoke", alpha=0.9)
     fig.colorbar(sc, label="Forward Efficiency (%)")
     plt.show()
+
+
+'''
+Function combine_meta_test
+takes:  metadata [pd.df] - must include design #
+        testdata [dict] - keys should be """_"""_## where ## matches design #
+return: tested_df [pd.df] - includes all metadata from metadata with max current/torque vals from testdata
+'''
+def combine_meta_test(metadata,testdata):
+    tested_df = metadata.copy()
+
+    for key in testdata.keys():
+        id_num = key.split('_')[-1]
+        max_current = 0
+        max_dxt = 0
+        for i in range(len(testdata[key])):
+            current_time = np.array(testdata[key][i][1][0])
+            current_vals = np.array(testdata[key][i][1][1])
+            dxt_time = np.array(testdata[key][i][0][0])
+            dxt_vals = np.array(testdata[key][i][0][1])
+
+            if np.mean(dxt_vals) > 1024: # CW
+                dxt_percent = (dxt_vals - 1024) / 1023
+            else:
+                dxt_percent =  dxt_vals / 1023 #CCW - keep value positive.
+
+            # print(np.nanmax(dxt_percent))
+
+            max_dxt = np.nanmax([np.percentile(dxt_percent, 99), max_dxt])
+            max_current = np.nanmax([np.percentile(current_vals, 99), max_current])
+
+        tested_df.loc[tested_df['Design'] == float(id_num),'max_current'] = max_current
+        tested_df.loc[tested_df['Design'] == float(id_num),'max_dxt'] = max_dxt
+
+    return tested_df
