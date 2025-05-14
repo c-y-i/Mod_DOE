@@ -200,7 +200,7 @@ NOTE - for scores to be transferable, give the same size vectors across differen
 
 '''
 
-def score_vals(in_vals, offsets = None, add_gear = True, return_verbose = False, mu = MU, ):
+def score_vals(in_vals, offsets = None, add_gear = False, return_verbose = False, mu = MU, ):
 
     # print(in_vals)
 
@@ -363,6 +363,8 @@ def combine_meta_test(metadata,testdata):
         id_num = key.split('_')[-1]
         max_current = 0
         max_dxt = 0
+        scnd_current = 0
+        scnd_dxt = 0
         for i in range(len(testdata[key])):
             current_time = np.array(testdata[key][i][1][0])
             current_vals = np.array(testdata[key][i][1][1])
@@ -374,12 +376,33 @@ def combine_meta_test(metadata,testdata):
             else:
                 dxt_percent =  dxt_vals / 1023 #CCW - keep value positive.
 
-            # print(np.nanmax(dxt_percent))
+            # Ignore the worst trial (of the 6)
+            this_max_dxt = np.percentile(dxt_percent, 99)
+            this_max_current = np.percentile(current_vals, 99)
+            if this_max_dxt > max_dxt:
+                scnd_dxt = max_dxt
+                max_dxt = this_max_dxt
+            elif this_max_dxt > scnd_dxt:
+                scnd_dxt = this_max_dxt
+            if this_max_current > max_current:
+                scnd_current = max_current
+                max_current = this_max_current
+            elif this_max_current > scnd_current:
+                scnd_current = this_max_current  
 
-            max_dxt = np.nanmax([np.percentile(dxt_percent, 99), max_dxt])
-            max_current = np.nanmax([np.percentile(current_vals, 99), max_current])
-
-        tested_df.loc[tested_df['Design'] == float(id_num),'max_current'] = max_current
-        tested_df.loc[tested_df['Design'] == float(id_num),'max_dxt'] = max_dxt
+        tested_df.loc[tested_df['Design'] == float(id_num),'max_current'] = scnd_current
+        tested_df.loc[tested_df['Design'] == float(id_num),'max_dxt'] = scnd_dxt
 
     return tested_df
+
+def df_to_sv(df):
+    """
+    Convert a DataFrame to [5,1] list of arrays - [z_sh, z_r2, xs, xr2, Cl]
+    """
+    out_list = []
+    out_list.append(np.array(df['z_sh'].values))
+    out_list.append(np.array(df['z_r2'].values))
+    out_list.append(np.array(df['x_s'].values))
+    out_list.append(np.array(df['x_r2'].values))
+    out_list.append(np.array(df['Cl'].values))
+    return out_list
