@@ -256,8 +256,9 @@ def plot_dict_key(in_dict, dict_key, save_loc = None, file_name = None):
     # set up colors
     base_c1 = cm.Reds
     base_c2 = cm.Blues
-    color1 = [base_c1(i / n) for i in range(n)]
-    color2 = [base_c2(i / n) for i in range(n)]
+    offset = 2 # to avoid very light colors
+    color1 = [base_c1(i / n) for i in range(n+offset)]
+    color2 = [base_c2(i / n) for i in range(n+offset)]
 
     # plot all the trials
     dxt_all_vals = []
@@ -272,8 +273,8 @@ def plot_dict_key(in_dict, dict_key, save_loc = None, file_name = None):
             dxt_percent = (dxt_vals - 1024) / 1023
         else:
             dxt_percent =  - dxt_vals / 1023 #CCW
-        ax.scatter(dxt_time, dxt_percent, c=color1[i], label='torque')
-        ax2.scatter(current_time, current_vals, c=color2[i], label='current')
+        ax.scatter(dxt_time, dxt_percent, c=color1[i+offset], label='torque')
+        ax2.scatter(current_time, current_vals, c=color2[i+offset], label='current')
         dxt_all_vals.extend(dxt_percent)  # Collect all values
         current_all_vals.extend(current_vals)
 
