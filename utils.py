@@ -214,7 +214,7 @@ def score_vals(in_vals, offsets = None, add_gear = False, return_verbose = False
 
     # print(in_vals)
 
-    # validated_design_vals = z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, r_a, I1, I2, gr_s, ratios
+    # validated_design_vals = z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, r_a ... , I1, I2, gr_s, ratios
     validated_design_vals, I1, I2, gr_s, ratios = validate_parameters(in_vals, offsets = offsets)
 
     eta_fwd, eta_bwd = efficiency_calc(validated_design_vals, mu=mu)
