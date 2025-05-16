@@ -44,18 +44,19 @@ returns: design_vals: [z_sh, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2, carrier]
 '''
 def validate_parameters(in_vals, offsets = None, target_z_r1 = TARG_zr1, target_xr1 = TARG_xr1):
 
+    working_vals = in_vals.copy()
     # Calculate all possible combinations of gear ratios
     if offsets is not None:
-        in_vals.append(offsets[0])
-        in_vals.append(offsets[1])
+        working_vals.append(offsets[0])
+        working_vals.append(offsets[1])
         z_sh, z_r2, xs, xr2, Cl, p1_offset, p2_offset = np.meshgrid(
-            *in_vals, indexing='ij'
+            *working_vals, indexing='ij'
         )
         p1_offset = p1_offset.flatten()
         p2_offset = p2_offset.flatten()
     else:   
         z_sh, z_r2, xs, xr2, Cl = np.meshgrid(
-            *in_vals, indexing='ij'
+            *working_vals, indexing='ij'
         )
         p1_offset, p2_offset = 0, 0
 
