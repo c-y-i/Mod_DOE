@@ -11,10 +11,18 @@ from matplotlib.offsetbox import AnchoredText
 import mplcursors 
 import os
 import json
+import pandas as pd
 
 import itertools
 
 from tqdm import tqdm
+
+from ax.generation_strategy.center_generation_node import CenterGenerationNode
+from ax.generation_strategy.transition_criterion import MinTrials
+from ax.generation_strategy.generation_strategy import GenerationStrategy
+from ax.generation_strategy.generation_node import GenerationNode
+from ax.generation_strategy.model_spec import GeneratorSpec
+from ax.modelbridge.registry import Generators
 
 config_path = os.path.join(os.path.dirname(__file__), 'wolfrom', "config.json")
 with open(config_path, "r") as f:
@@ -407,3 +415,152 @@ def df_to_sv(df):
     out_list.append(np.array(df['x_r2'].values))
     out_list.append(np.array(df['Cl'].values))
     return out_list
+
+
+########################################################################
+#########################   AX.dev FUNCTIONS   #########################
+########################################################################
+
+def construct_generation_strategy(
+    generator_spec: GeneratorSpec, node_name: str,
+) -> GenerationStrategy:
+    """Constructs a Center + Sobol + Modular BoTorch `GenerationStrategy`
+    using the provided `generator_spec` for the Modular BoTorch node.
+    """
+    botorch_node = GenerationNode(
+        node_name=node_name,
+        model_specs=[generator_spec],
+    )
+    sobol_node = GenerationNode(
+        node_name="Sobol",
+        model_specs=[
+            GeneratorSpec(
+                model_enum=Generators.SOBOL,
+                # Let's use model_kwargs to set the random seed.
+                model_kwargs={"seed": 0},
+            ),
+        ],
+        transition_criteria=[
+            # Transition to BoTorch node once there are 10 trials on the experiment.
+            # Updated from default 5 (to match the number of inputs we're giving)
+            MinTrials(
+                threshold=10,
+                transition_to=botorch_node.node_name,
+                use_all_trials_in_exp=True,
+            )
+        ]
+    )
+    # Center node is a customized node that uses a simplified logic and has a
+    # built-in transition criteria that transitions after generating once.
+    center_node = CenterGenerationNode(next_node_name=sobol_node.node_name)
+    return GenerationStrategy(
+        name=f"Sobol+{node_name}",
+        # nodes=[center_node, sobol_node, botorch_node]
+        nodes=[sobol_node, botorch_node]
+    )
+
+
+# Let's construct the simplest version with all defaults.
+construct_generation_strategy(
+    generator_spec=GeneratorSpec(model_enum=Generators.BOTORCH_MODULAR),
+    node_name="Modular BoTorch",
+)
+
+def add_trials(client, test_meta_df, param_names, choice_bounds, int_bounds, inds = 'all'):
+    
+    try:
+        trial = np.max(client.summarize()['trial_index'])+1
+    except:
+        trial = 0
+
+    if inds == 'all':
+        # inds = [x for x in test_meta_df['Design']]
+        inds = range(len(test_meta_df))
+    
+    for ind in inds:
+        row = test_meta_df.iloc[ind]
+        if row['max_dxt'] >= 0.95:
+            max_dxt = 1e12
+        else:
+            max_dxt = row['max_dxt']
+        
+        these_param = {}
+        for name in param_names:
+            if name in choice_bounds.keys():
+                if str(row[name]) == 'nan':
+                    these_param[name] = 'None'
+                else:
+                    these_param[name] = str(row[name])
+            elif name in int_bounds.keys():
+                these_param[name] = int(row[name])
+            else:
+                these_param[name] = float(row[name])
+
+        client.attach_trial(parameters = these_param)
+
+        ratio = row['gear_ratio']
+        if ratio == np.inf or ratio >=1500: # Hard-cap on gear-ratio at 1500
+            ratio = 1500
+
+        score = ratio / max_dxt
+        data = {
+            "Max_torque_gear_ratio_product": score,
+            "gear_ratio" : ratio,
+            # "gear_ratio": row['gear_ratio'],
+            # "max_dxt": max_dxt,
+            # "max_current": row['max_current'],
+            # "gear_ratio_diff": ratios[ind],
+        }
+        if not np.isnan(score).any():
+            client.complete_trial(trial_index = trial, raw_data = data)
+        else:
+            print('Incomplete trial remains.')
+            Incomplete = True
+        trial += 1
+    
+    
+def df_for_new_trials(trials, meta_order, design_order): 
+    new_design_vals = [] # for CAD work
+    new_meta_vals = [] # for meta data
+    new_keys = []
+    for key in trials:
+        trial = trials[key]
+        new_keys.append(key)
+        
+        # start pd with meta_order as columns
+        new_meta = []
+        new_meta.append(key) #design
+        for column in meta_order:
+            if column in trial.keys():
+                new_meta.append(trial[column])    
+        # invals = [z_sh, z_r2, xs, xr2, Cl]
+        invals =  [trial['z_sh'], trial['z_r2'], trial['x_s'], trial['x_r2'], trial['Cl']]
+        # offsets = [p1_offset, p2_offset]
+        offsets = [trial['p1_offset'], trial['p2_offset']]
+        design_vals = [x[0] for x in validate_parameters(invals, offsets=offsets)[0]]
+        ratio = [x for x in validate_parameters(invals, offsets=offsets)[-1]][0]
+        if ratio == np.inf or ratio >=1500: # Hard-cap on gear-ratio at 1500
+            ratio = 1500
+        new_meta.append(ratio)
+        # double z_sh
+        design_vals[0] = 2*design_vals[0]
+        # add thickness, clearance, material, lubricant
+        design_vals.append(trial['g_thickness_h']*2)
+        design_vals.append(trial['Cl'])
+        design_vals.append(trial['material'])
+        design_vals.append(trial['lubricant'])
+        # add trial key (index) to the beginning
+        design_vals.insert(0, key)
+        # round 5-9 to 4 decimal places
+        for i in range(5, 10):
+            design_vals[i] = round(design_vals[i], 4)
+        
+        # add new values
+        new_design_vals.append(design_vals)
+        new_meta_vals.append(new_meta)
+    # save as df
+    new_design_vals_df = pd.DataFrame(new_design_vals, columns=design_order)
+    new_meta_vals_df = pd.DataFrame(new_meta_vals, columns=meta_order)
+
+    return new_design_vals_df, new_meta_vals_df
+    
