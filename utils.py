@@ -276,7 +276,8 @@ def list_to_param(param_list, vals_per = 4):
     """
     Function 'list_to_param'
     takes: param_list [5,1] list for use in score_vals - [z_sh, z_r2, xs, xr2, Cl, p1_offset, p2_offset]
-    gives: params - dictionary from Ax.dev detailing parameters
+    gives: params - dictionary from Ax.dev detailing parameters.
+    NOTE - only necessary for BO to choose parameters (regular gear BO doesn't use this)
     """
 
     if len(param_list) == 4:
@@ -424,8 +425,9 @@ def df_to_sv(df):
 def construct_generation_strategy(
     generator_spec: GeneratorSpec, node_name: str,
 ) -> GenerationStrategy:
-    """Constructs a Center + Sobol + Modular BoTorch `GenerationStrategy`
+    """Constructs a Sobol + Modular BoTorch `GenerationStrategy`
     using the provided `generator_spec` for the Modular BoTorch node.
+    Direct from Ax.dev Tutorials.
     """
     botorch_node = GenerationNode(
         node_name=node_name,
@@ -459,15 +461,16 @@ def construct_generation_strategy(
         nodes=[sobol_node, botorch_node]
     )
 
-
-# Let's construct the simplest version with all defaults.
-construct_generation_strategy(
-    generator_spec=GeneratorSpec(model_enum=Generators.BOTORCH_MODULAR),
-    node_name="Modular BoTorch",
-)
-
 def add_trials(client, test_meta_df, param_names, choice_bounds, int_bounds, inds = 'all'):
-    
+    """
+    adds trials from the 'test_meta_df' to the Ax.dev client.
+    :param client: Ax.dev client
+    :param test_meta_df: dataframe of trials to add (see combine_meta_test)
+    :param param_names: list of parameter names to add
+    :param choice_bounds: dictionary of choice bounds (created during intialization)
+    :param int_bounds: dictionary of integer bounds (created during initialization)
+    :param inds: list of indices to add (default is all trials)
+    """
     try:
         trial = np.max(client.summarize()['trial_index'])+1
     except:
