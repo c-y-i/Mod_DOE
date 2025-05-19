@@ -202,6 +202,7 @@ def efficiency_calc(design_vals, target_z_r1 = TARG_zr1, mu = MU):
 '''
 Function 'score vals'
 takes:  in_vals (parameters to sweep) [5,1] list of arrays - [z_sh, z_r2, xs, xr2, Cl] OR [4,1] if add_cl is True.
+        offsets - [2,1] - p1_offset, p2_offset (defaults to [0,0])
         add_gear - boolean whether to also add in the values from Matsuki 2019 paper
         add_cl - boolean whether to also add in set Cl values (False means they will be given)
 gives: score [scalar] - number of valid combinations
