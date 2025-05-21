@@ -11,6 +11,7 @@
 import os
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import seaborn as sns
 
 # if os.name == 'nt':
 #     import msvcrt
@@ -256,9 +257,11 @@ def plot_dict_key(in_dict, dict_key, save_loc = None, file_name = None):
     # set up colors
     base_c1 = cm.Reds
     base_c2 = cm.Blues
-    offset = 2 # to avoid very light colors
-    color1 = [base_c1(i / n) for i in range(n+offset)]
-    color2 = [base_c2(i / n) for i in range(n+offset)]
+    offset = 0 # to avoid very light colors
+    # color1 = [base_c1(i / n) for i in range(n+offset)]
+    # color2 = [base_c2(i / n) for i in range(n+offset)]
+    color1 = sns.color_palette("rocket", n)  
+    color2 = sns.color_palette("mako", n)  
 
     # plot all the trials
     dxt_all_vals = []
@@ -303,35 +306,59 @@ def valve_plot_dict_key(in_dict, dict_key, save_loc = None, file_name = None):
 
     n = len(in_dict[dict_key])
 
+    multiple = isinstance(in_dict[dict_key][0][1][0], list) # bool
+
     # set up colors
     base_c1 = cm.Reds
     base_c2 = cm.Blues
-    color1 = [base_c1(i / n) for i in range(n)]
-    color2 = [base_c2(i / n) for i in range(n)]
+    offset = 2 # to avoid very light colors (and very dark w/ +1)
+    color1 = [base_c1(i / n) for i in range(n+2*offset)]
+    color2 = [base_c2(i / n) for i in range(n+2*offset)]
+    palette = sns.color_palette("rocket", n)  # or try "Set2", "tab10", "deep", etc.
+    palette2 = sns.color_palette("mako", n)
 
     # plot all the trials
-    p1_all_vals = []
+    p1_all_vals = [] # max pressure should always occur @ p1 (not p2) 
+    p2_all_vals = []
     for i in range(n):
-        p1_time = np.array(in_dict[dict_key][i][0])
-        p1_vals = np.array(in_dict[dict_key][i][1])
+        if multiple:
+            p1_time = np.array(in_dict[dict_key][i][0])
+            p1_vals = np.array([x[0] for x in in_dict[dict_key][i][1]])
+            p2_vals = np.array([x[1] for x in in_dict[dict_key][i][1]])
+            p_diff = p1_vals - p2_vals
+            # ax.scatter(p1_time, p1_vals, c=color2[i+offset], label='pressure')
+            ax.scatter(p1_time, p1_vals, color=palette[i], label=f'p1 - trial {i+1}')
+            ax.scatter(p1_time, p2_vals, color=palette[i], marker = 'x', label=f'p2- trial {i+1}')
+            ax.scatter(p1_time, p_diff, color=palette[i], marker = '*', s= 0.5, label=f'p_diff - trial {i+1}')
+            p1_all_vals.extend(p1_vals)
+            p2_all_vals.extend(p2_vals)
 
-        ax.scatter(p1_time, p1_vals, c=color1[i], label='pressure')
-        p1_all_vals.extend(p1_vals)
+
+            
+        else:
+            p1_time = np.array(in_dict[dict_key][i][0])
+            p1_vals = np.array(in_dict[dict_key][i][1])
+
+            # ax.scatter(p1_time, p1_vals, c=color2[i+offset], label='pressure')
+            ax.scatter(p1_time, p1_vals, color=palette[i], label=f'trial {i+1}')
+            p1_all_vals.extend(p1_vals)
 
     ax.set_xlabel('time (ms)')
     ax.set_ylabel('p1 pressure (kPa)')
     # ax2.set_xlabel('time (ms)')
     # ax2.set_ylabel('p2 pressure (kPa)')
-    p1_ll = np.percentile(p1_all_vals, 1)
+    # p1_ll = np.percentile(p1_all_vals, 1)
+    p2_ll = np.percentile(p2_all_vals, 1)
     p1_ul = np.percentile(p1_all_vals, 99)
 
-    ax.set_ylim([p1_ll, p1_ul])
+    ax.set_ylim([0, p1_ul])
 
     plt.tight_layout()
     if save_loc and file_name:
         save_path = f"{save_loc}/{file_name}"
         plt.savefig(save_path)  # Save the figure to the specified location
 
+    plt.legend()
     plt.show()
 
 #################################################
@@ -512,17 +539,18 @@ def read_pressure(q, serial_port, baud_rate=esp_baud):
             pressure_vals.append(-1)
             continue
         try:
-            value = parse_string(line, float_only=True)[0]
-            pressure_vals.append(value)
+            value1 = parse_string(line, float_only=True)[0]
+            value2 = parse_string(line, float_only=True)[1]
+            pressure_vals.append([value1, value2])
         except:
-            value = parse_string(line, float_only=True)
-            if len(value):
-                try:
-                    pressure_vals.append(value)
-                except:
-                    pressure_vals.append(-1)
-            else:
-                pressure_vals.append(-1)
+            # value = parse_string(line, float_only=True)
+            # if len(value):
+            #     try:
+            #         pressure_vals.append(value)
+            #     except:
+            #         pressure_vals.append(-1)
+            # else:
+            pressure_vals.append(-1)
         
 
     print(f'Posting pressure vals, shape: {len(pressure_vals)}')
@@ -533,7 +561,7 @@ def read_pressure(q, serial_port, baud_rate=esp_baud):
 # Valve Experiment - Main Function
 #################################################
 
-def Valve_Experiment(in_dict, RUNTIME = 2, in_key = 'test', file_dir = None, file_name = None, save = True):
+def Valve_Experiment(in_dict, RUNTIME = 2, in_key = 'test', file_dir = None, file_name = None, save = True, power_level = 'High'):
 
     print(f'Running pump for {RUNTIME} seconds ...')
 
@@ -553,7 +581,13 @@ def Valve_Experiment(in_dict, RUNTIME = 2, in_key = 'test', file_dir = None, fil
     # Start the pump
     start_time = time.time()
 
-    send_error = send_character(esp_serial, esp_baud, AIR_PUMP_ON, return_error=True)
+    if power_level == 'High':
+        send_error = send_character(esp_serial, esp_baud, AIR_PUMP_ON, return_error=True)
+    elif power_level == 'Low':
+        send_error = send_character(esp_serial, esp_baud, AIR_PUMP_LOW, return_error=True)
+    else:
+        send_error = True
+        print(f'Invalid power level: {power_level}. Must be "High" or "Low".')
     if send_error:
         print(f'Failed communication with Microcontroller. Stopping Script.')
         return

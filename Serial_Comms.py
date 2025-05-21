@@ -14,6 +14,7 @@ import re
 # Commands
 AIR_PUMP_ON = 'w\n'.encode()
 AIR_PUMP_OFF = 's\n'.encode()
+AIR_PUMP_LOW = 'e\n'.encode()
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Function definitions
