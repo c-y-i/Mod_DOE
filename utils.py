@@ -113,7 +113,7 @@ def validate_parameters(in_vals, offsets = None, target_z_r1 = TARG_zr1, target_
     # z_s, z_p1, z_p2, z_r2, xs, xp1, xp2, xr2 = z_s[valid_combinations], z_p1[valid_combinations], z_p2[valid_combinations], z_r2[valid_combinations], xs[valid_combinations], xp1[valid_combinations], xp2[valid_combinations], xr2[valid_combinations]
     # I1, I2, gr_s, ratios = I1[valid_combinations], I2[valid_combinations], gr_s[valid_combinations], ratios[valid_combinations]
 
-    # print(f'Shapes: {z_s.shape}, {z_p1.shape}, {z_p2.shape}, {z_r2.shape}, {xs.shape}, {xp1.shape}, {xp2.shape}, {xr2.shape}, {ratios.shape}')
+    # print(f'Shapes: {z_s.shape}, {z_p1.shape}, {z_p2.shape}, {z_r2.shape}, {xs.shape}, {xp1.shape}, xp2.shape}, {xr2.shape}, {ratios.shape}')
     assert z_s.shape == z_p1.shape == z_p2.shape == z_r2.shape == xs.shape == xp1.shape == xp2.shape == xr2.shape == ratios.shape
 
     z_sh = z_s / 2 # convert back to z_s / 2 for output
@@ -419,6 +419,57 @@ def df_to_sv(df):
     return out_list
 
 
+def df_to_sv_valve(df):
+    """
+    Convert a valve DataFrame to a list of arrays containing valve design parameters
+    [material, cut, thickness, dome_height]
+    """
+    out_list = []
+    out_list.append(np.array(df['material'].values))
+    out_list.append(np.array(df['cut'].values))
+    out_list.append(np.array(df['thickness'].values))
+    out_list.append(np.array(df['dome_height'].values))
+    return out_list
+
+
+def extract_crack_pressure(test_data):
+    max_pressure = 0
+    # If test_data is already a list of trials 
+    if isinstance(test_data, list):
+        trials = test_data
+        for trial in trials:
+            if len(trial) >= 2 and len(trial[1]) > 0:
+                # Second element contains pressure values
+                pressure_values = [float(p) for p in trial[1] if isinstance(p, (int, float))]
+                if pressure_values:
+                    trial_max = max(pressure_values)
+                    max_pressure = max(max_pressure, trial_max)
+    
+    # If test_data is a dictionary with keys (like TESTING_0)
+    elif isinstance(test_data, dict):
+        # Each key in the dictionary represents a test
+        for test_key in test_data:
+            if isinstance(test_data[test_key], list):
+                # Each test has multiple trials 
+                for trial in test_data[test_key]:
+                    if len(trial) >= 2 and len(trial[1]) > 0:
+                        # Second element contains pressure values
+                        pressure_values = [float(p) for p in trial[1] if isinstance(p, (int, float))]
+                        if pressure_values:
+                            trial_max = max(pressure_values)
+                            max_pressure = max(max_pressure, trial_max)
+    
+    return max_pressure
+
+def calculate_squared_error(crack_pressure):
+    """
+    Calculate squared error for crack pressure.
+    Returns the raw squared value instead of negating it.
+    """
+    # Return just the squared value
+    return crack_pressure ** 2
+
+
 ########################################################################
 #########################   AX.dev FUNCTIONS   #########################
 ########################################################################
@@ -567,4 +618,94 @@ def df_for_new_trials(trials, meta_order, design_order):
     new_meta_vals_df = pd.DataFrame(new_meta_vals, columns=meta_order)
 
     return new_design_vals_df, new_meta_vals_df
+
+def add_trials_valve(client, test_meta_df, param_names, choice_bounds, int_bounds, inds = 'all'):
+    """
+    Adds valve trials from the 'test_meta_df' to the Ax.dev client.
+    Handles DataFrames that may be missing squared_error or crack_pressure columns.
+    """
+    try:
+        trial = np.max(client.summarize()['trial_index'])+1
+    except:
+        trial = 0
+
+    if inds == 'all':
+        inds = range(len(test_meta_df))
     
+    for ind in inds:
+        row = test_meta_df.iloc[ind]
+        
+        # Create parameter dictionary for this trial
+        these_param = {}
+        for name in param_names:
+            if name in choice_bounds.keys():
+                if str(row.get(name, 'nan')) == 'nan':
+                    these_param[name] = choice_bounds[name][0]  # Default to first choice
+                else:
+                    these_param[name] = str(row[name])
+            elif name in int_bounds.keys():
+                these_param[name] = int(row[name])
+            else:
+                these_param[name] = float(row[name])
+
+        client.attach_trial(parameters=these_param)
+
+        # Check if we have existing crack pressure data
+        data = {}
+        if 'crack_pressure' in row and not pd.isna(row['crack_pressure']):
+            data["crack_pressure"] = float(row['crack_pressure'])
+            
+            # Calculate squared error if it's not available
+            if 'squared_error' in row and not pd.isna(row['squared_error']):
+                data["squared_error"] = float(row['squared_error'])
+            else:
+                # Calculate it using our standard formula without negation
+                data["squared_error"] = data["crack_pressure"] ** 2
+                
+            client.complete_trial(trial_index=trial, raw_data=data)
+        else:
+            print(f'Skipping incomplete trial (index {ind}) - no pressure data.')
+            
+        trial += 1
+
+def df_for_new_trials_valve(trials, meta_order):
+    """
+    Prepares dataframes for new valve trials 
+    """
+    new_design_vals = [] # for CAD work
+    new_meta_vals = [] # for meta data
+    new_keys = []
+    
+    design_order = ['index', 'material', 'cut', 'thickness', 'dome_height']
+    
+    for key in trials:
+        trial = trials[key]
+        new_keys.append(key)
+        
+        # Start pd with meta_order as columns
+        new_meta = []
+        new_meta.append(key) # Design number
+        
+        # Add parameters from the trial
+        for column in meta_order[1:]:  # Skip the Design column as we already added it
+            if column in trial.keys():
+                new_meta.append(trial[column])
+        
+        # Create design values for CAD
+        design_vals = [
+            key,                    # index (design number)
+            trial['material'],       # material type
+            trial['cut'],           # cut pattern
+            trial['thickness'],     # thickness in mm
+            trial['dome_height']    # dome height in mm
+        ]
+        
+        # Add new values to our lists
+        new_design_vals.append(design_vals)
+        new_meta_vals.append(new_meta)
+    
+    # Convert to dataframes
+    new_design_vals_df = pd.DataFrame(new_design_vals, columns=design_order)
+    new_meta_vals_df = pd.DataFrame(new_meta_vals, columns=meta_order)
+
+    return new_design_vals_df, new_meta_vals_df
