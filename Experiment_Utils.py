@@ -536,7 +536,7 @@ def read_pressure(q, serial_port, baud_rate=esp_baud):
         try:
             line = row.decode('utf-8').rstrip()
         except:
-            pressure_vals.append(-1)
+            pressure_vals.append([-1, -1])
             continue
         try:
             value1 = parse_string(line, float_only=True)[0]
@@ -550,7 +550,8 @@ def read_pressure(q, serial_port, baud_rate=esp_baud):
             #     except:
             #         pressure_vals.append(-1)
             # else:
-            pressure_vals.append(-1)
+            pressure_vals.append([-1,-1])
+            continue
         
 
     print(f'Posting pressure vals, shape: {len(pressure_vals)}')
@@ -619,6 +620,9 @@ def Valve_Experiment(in_dict, RUNTIME = 2, in_key = 'test', file_dir = None, fil
     valve_rec_bool = False
     thread_pressure.join()
     input = valve_queue.get()
+
+    # if len(input[-1]) !=2:
+    #     print(f'Error in valve data collection. Stop Testing ASAP.')
 
     # add to existing dictionary
     key_name = in_key
