@@ -1,0 +1,13 @@
+{
+	"autodeskProduct":	"Fusion360",
+	"type":	"addin",
+	"id":	"mod-doe-gear-maker-69420",
+	"author":	"Yi C.",
+	"description":	{
+		"":	"customized version of GF-Gear-Generator"
+	},
+	"version":	"1.0.0",
+	"runOnStartup":	true,
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true
+}
