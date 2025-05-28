@@ -1,0 +1,2 @@
+index,z_s,z_p1,z_p2,z_r2,xs,xp1,xp2,xr2,r_a,thickness,Cl,material,lubricant
+32,12.0,38.0,27.0,76,0.5792,-0.1646,0.5739,0.7954,0.0206,12,0.0003,PLA,PTFE
