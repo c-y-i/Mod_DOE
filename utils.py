@@ -431,43 +431,116 @@ def df_to_sv_valve(df):
     out_list.append(np.array(df['dome_height'].values))
     return out_list
 
+def max_near_crack(P1, P2, tol=0.5, region_range = 20, return_region = False):
+    """
+    Finds the index of the local maximum of P1 in the region where P2 increases from (near) zero.
+    Args:
+        P1: list or array of values (e.g., pressure 1)
+        P2: list or array of values (e.g., pressure 2)
+        tol: tolerance for considering P2 as 'zero'
+    Returns:
+        max_P1_index: the index in P1 of the local maximum in the region
+        region_indices: the indices of the region considered
+    """
+    P1 = np.asarray(P1)
+    P2 = np.asarray(P2)
+    # Find where P2 is (near) zero
+    zero_indices = np.where(np.abs(P2) < tol)[0]
+    if len(zero_indices) == 0:
+        start_idx = 0
+    else:
+        start_idx = zero_indices[-1]  # last zero (or near zero) index
+
+    # Find the region where P2 is strictly increasing after start_idx
+    min_ind = np.max([0, start_idx - region_range])  # ensure we don't go below zero
+    max_ind = np.min([len(P2), start_idx + region_range])  # ensure we don't go beyond the length of P2
+    region = list(range(min_ind, max_ind))
+
+    region_indices = np.array(region)
+    region_P1 = P1[region_indices]
+    if len(region_P1) == 0:
+        return None, region_indices
+
+    max_idx_in_region = np.argmax(region_P1)
+    max_P1_index = region_indices[max_idx_in_region]
+    if return_region:
+        # Return the index in P1 and the indices of the region
+        return max_P1_index, region_indices
+    else:
+        return max_P1_index  
+
 
 def extract_crack_pressure(test_data):
-    max_pressure = 0
-    # If test_data is already a list of trials 
-    if isinstance(test_data, list):
-        trials = test_data
-        for trial in trials:
-            if len(trial) >= 2 and len(trial[1]) > 0:
-                # Second element contains pressure values
-                pressure_values = [float(p) for p in trial[1] if isinstance(p, (int, float))]
-                if pressure_values:
-                    trial_max = max(pressure_values)
-                    max_pressure = max(max_pressure, trial_max)
-    
+    """
+    Take in a dictionary of test data, return a dictionary of crack pressures.
+    """    
+    crack_pressures = {}
     # If test_data is a dictionary with keys (like TESTING_0)
-    elif isinstance(test_data, dict):
+    if isinstance(test_data, dict):
         # Each key in the dictionary represents a test
         for test_key in test_data:
+            key_cracks = []
             if isinstance(test_data[test_key], list):
                 # Each test has multiple trials 
                 for trial in test_data[test_key]:
                     if len(trial) >= 2 and len(trial[1]) > 0:
                         # Second element contains pressure values
-                        pressure_values = [float(p) for p in trial[1] if isinstance(p, (int, float))]
-                        if pressure_values:
-                            trial_max = max(pressure_values)
-                            max_pressure = max(max_pressure, trial_max)
+                        P1 = [float(p[0]) for p in trial[1] if isinstance(p[0], (int, float))]
+                        P2 = [float(p[1]) for p in trial[1] if isinstance(p[1], (int, float))]
+                        if P1:
+                            max_location = max_near_crack(P1, P2)
+                            if max_location is None:
+                                print(f"Warning: No crack region found for test {test_key}.")
+                                continue
+                            else:
+                                trial_max = P1[max_location] - P2[max_location]
+                                key_cracks.append(trial_max)
+            if key_cracks:
+                # store the average value
+                crack_pressures[test_key] = sum(key_cracks) / len(key_cracks)
     
-    return max_pressure
+    return crack_pressures
 
-def calculate_squared_error(crack_pressure):
+def extract_delta_p(test_data):
+    """
+    Take in a dictionary of test data, return a dictionary of final pressure differentials.
+    """    
+    delta_pressures = {}
+    # If test_data is a dictionary with keys (like TESTING_0)
+    if isinstance(test_data, dict):
+        # Each key in the dictionary represents a test
+        for test_key in test_data:
+            d_ps = []
+            if isinstance(test_data[test_key], list):
+                # Each test has multiple trials 
+                for trial in test_data[test_key]:
+                    if len(trial) >= 2 and len(trial[1]) > 0:
+                        # Second element contains pressure values
+                        P1 = [float(p[0]) for p in trial[1] if isinstance(p[0], (int, float))]
+                        P2 = [float(p[1]) for p in trial[1] if isinstance(p[1], (int, float))]
+                        # print(f'lens P1: {len(P1)}, P2: {(len(P2))}')
+                        if P1 and P2:
+                            max_location = max_near_crack(P1, P2)
+                            if max_location is None:
+                                print(f"Warning: No crack region found for test {test_key}.")
+                                continue
+                            elif max_location < len(P2):
+                                trial_diff = np.array(P1[max_location:]) - np.array(P2[max_location:])
+                                d_ps.append(np.mean(trial_diff))
+            
+            if d_ps:
+                # store the average value
+                delta_pressures[test_key] = sum(d_ps) / len(d_ps)
+    
+    return delta_pressures
+
+def calculate_RMSE(actual, target):
     """
     Calculate squared error for crack pressure.
     Returns the raw squared value instead of negating it.
     """
     # Return just the squared value
-    return crack_pressure ** 2
+    return np.sqrt((target - actual) ** 2)
 
 
 ########################################################################
@@ -619,11 +692,12 @@ def df_for_new_trials(trials, meta_order, design_order):
 
     return new_design_vals_df, new_meta_vals_df
 
-def add_trials_valve(client, test_meta_df, param_names, choice_bounds, int_bounds, inds = 'all'):
+def add_trials_valve(client, test_meta_df, param_names, choice_bounds, int_bounds, inds = 'all', target_crack_pressure = 5, target_P_diff = 1):
     """
     Adds valve trials from the 'test_meta_df' to the Ax.dev client.
-    Handles DataFrames that may be missing squared_error or crack_pressure columns.
+    Handles DataFrames that may be missing crack_pressure or ss_P_diff.
     """
+
     try:
         trial = np.max(client.summarize()['trial_index'])+1
     except:
@@ -650,21 +724,21 @@ def add_trials_valve(client, test_meta_df, param_names, choice_bounds, int_bound
 
         client.attach_trial(parameters=these_param)
 
-        # Check if we have existing crack pressure data
+        # Check if we have existing crack pressure data & ss_P_diff data
         data = {}
         if 'crack_pressure' in row and not pd.isna(row['crack_pressure']):
             data["crack_pressure"] = float(row['crack_pressure'])
-            
-            # Calculate squared error if it's not available
-            if 'squared_error' in row and not pd.isna(row['squared_error']):
-                data["squared_error"] = float(row['squared_error'])
-            else:
-                # Calculate it using our standard formula without negation
-                data["squared_error"] = data["crack_pressure"] ** 2
+        if 'ss_P_diff' in row and not pd.isna(row['ss_P_diff']):
+            data["ss_P_diff"] = float(row['ss_P_diff'])
+        # If we have both values, calculate the score
+        if 'crack_pressure' in data and 'ss_P_diff' in data:
+            # Calculate the score based on the target values
+            data["crack_error"] = calculate_RMSE(data["crack_pressure"],target_crack_pressure)
+            data["ss_error"] = calculate_RMSE(data["ss_P_diff"],target_P_diff)
                 
             client.complete_trial(trial_index=trial, raw_data=data)
         else:
-            print(f'Skipping incomplete trial (index {ind}) - no pressure data.')
+            print(f'Skipping incomplete trial (index {ind}) - missing data.')
             
         trial += 1
 
