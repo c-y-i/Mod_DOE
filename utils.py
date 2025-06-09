@@ -426,9 +426,10 @@ def df_to_sv_valve(df):
     """
     out_list = []
     out_list.append(np.array(df['material'].values))
-    out_list.append(np.array(df['cut'].values))
+    out_list.append(np.array(df['cut_geometry'].values))    
     out_list.append(np.array(df['thickness'].values))
     out_list.append(np.array(df['dome_height'].values))
+    out_list.append(np.array(df['cut_length'].values))
     return out_list
 
 def max_near_crack(P1, P2, tol=0.5, region_range = 20, return_region = False):
@@ -692,7 +693,7 @@ def df_for_new_trials(trials, meta_order, design_order):
 
     return new_design_vals_df, new_meta_vals_df
 
-def add_trials_valve(client, test_meta_df, param_names, choice_bounds, int_bounds, inds = 'all', target_crack_pressure = 5, target_P_diff = 1):
+def add_trials_valve(client, test_meta_df, param_names, choice_bounds, int_bounds, inds = 'all', target_crack_pressure = 10, target_P_diff = 5):
     """
     Adds valve trials from the 'test_meta_df' to the Ax.dev client.
     Handles DataFrames that may be missing crack_pressure or ss_P_diff.
@@ -750,7 +751,7 @@ def df_for_new_trials_valve(trials, meta_order):
     new_meta_vals = [] # for meta data
     new_keys = []
     
-    design_order = ['index', 'material', 'cut', 'thickness', 'dome_height']
+    design_order = ['Design', 'material', 'cut_geometry', 'thickness', 'dome_height', 'cut_length']
     
     for key in trials:
         trial = trials[key]
@@ -769,9 +770,10 @@ def df_for_new_trials_valve(trials, meta_order):
         design_vals = [
             key,                    # index (design number)
             trial['material'],       # material type
-            trial['cut'],           # cut pattern
+            trial['cut_geometry'],           # cut pattern
             trial['thickness'],     # thickness in mm
-            trial['dome_height']    # dome height in mm
+            trial['dome_height'],    # dome height in mm
+            trial['cut_length']
         ]
         
         # Add new values to our lists
