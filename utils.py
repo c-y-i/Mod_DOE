@@ -587,6 +587,45 @@ def construct_generation_strategy(
         nodes=[sobol_node, botorch_node]
     )
 
+def construct_generation_strategy_valve(
+    generator_spec: GeneratorSpec, node_name: str,
+) -> GenerationStrategy:
+    """Constructs a Sobol + Modular BoTorch `GenerationStrategy`
+    using the provided `generator_spec` for the Modular BoTorch node.
+    Direct from Ax.dev Tutorials.
+    """
+    botorch_node = GenerationNode(
+        node_name=node_name,
+        model_specs=[generator_spec],
+    )
+    sobol_node = GenerationNode(
+        node_name="Sobol",
+        model_specs=[
+            GeneratorSpec(
+                model_enum=Generators.SOBOL,
+                # Let's use model_kwargs to set the random seed.
+                model_kwargs={"seed": 0},
+            ),
+        ],
+        transition_criteria=[
+            # Transition to BoTorch node once there are 10 trials on the experiment.
+            # Updated from default 5 (to match the number of inputs we're giving)
+            MinTrials(
+                threshold=5,
+                transition_to=botorch_node.node_name,
+                use_all_trials_in_exp=True,
+            )
+        ]
+    )
+    # Center node is a customized node that uses a simplified logic and has a
+    # built-in transition criteria that transitions after generating once.
+    center_node = CenterGenerationNode(next_node_name=sobol_node.node_name)
+    return GenerationStrategy(
+        name=f"Sobol+{node_name}",
+        # nodes=[center_node, sobol_node, botorch_node]
+        nodes=[sobol_node, botorch_node]
+    )
+
 def add_trials(client, test_meta_df, param_names, choice_bounds, int_bounds, inds = 'all'):
     """
     adds trials from the 'test_meta_df' to the Ax.dev client.
@@ -693,7 +732,7 @@ def df_for_new_trials(trials, meta_order, design_order):
 
     return new_design_vals_df, new_meta_vals_df
 
-def add_trials_valve(client, test_meta_df, param_names, choice_bounds, int_bounds, inds = 'all', target_crack_pressure = 10, target_P_diff = 5):
+def add_trials_valve(client, test_meta_df, param_names, choice_bounds, int_bounds, inds = 'all', target_crack_pressure = .10, target_P_diff = .05):
     """
     Adds valve trials from the 'test_meta_df' to the Ax.dev client.
     Handles DataFrames that may be missing crack_pressure or ss_P_diff.
