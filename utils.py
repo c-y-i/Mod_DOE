@@ -388,8 +388,14 @@ def combine_meta_test(metadata,testdata):
                 dxt_percent =  dxt_vals / 1023 #CCW - keep value positive.
 
             # Ignore the worst trial (of the 6)
-            this_max_dxt = np.percentile(dxt_percent, 99)
-            this_max_current = np.percentile(current_vals, 99)
+            if len(current_vals) == 0:
+                # TODO - decide what filler value to input.
+                print(f"Warning: No dxt values found for test {key} trial {i}.")
+                this_max_dxt = 1
+                this_max_current = 1000
+            else:    
+                this_max_dxt = np.percentile(dxt_percent, 99)
+                this_max_current = np.percentile(current_vals, 99)
             if this_max_dxt > max_dxt:
                 scnd_dxt = max_dxt
                 max_dxt = this_max_dxt
