@@ -14,4 +14,4 @@ Design,material,thickness,dome_height,cut_length,cut_geometry,crack_pressure,ss_
 13,E0050,0.75,1.5,0.75,slit,0.272,0.254
 14,E0050,0.2,3.8,2,triple,0.01,0.01
 15,E0050,0.5,1,1.5,triple,0.08,0.074
-16,E0050,1.5,2.2,1,X,,
+16,E0050,1.5,2.2,1,X,1,1
