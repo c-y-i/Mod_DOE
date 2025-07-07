@@ -413,13 +413,13 @@ def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_
     # use a Queue for thread-safe communication
     output_queue = Queue()
 
-    thread_current = threading.Thread(target=read_current, args=(output_queue, esp_serial, esp_baud))
+    # thread_current = threading.Thread(target=read_current, args=(output_queue, esp_serial, esp_baud))
     thread_dxl = threading.Thread(target=dxl_read_loads, args=(output_queue,))
 
     global gear_rec_bool 
     gear_rec_bool = True
     # Start threads
-    thread_current.start()
+    # thread_current.start()
 
     # # Write goal speed
     dxl_set_LED(True)
@@ -442,8 +442,8 @@ def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_
         portHandler.closePort()
 
         gear_rec_bool = False
-        if thread_current.is_alive():
-            thread_current.join()
+        # if thread_current.is_alive():
+        #     thread_current.join()
         if thread_dxl.is_alive():
             thread_dxl.join()
         return
@@ -456,16 +456,17 @@ def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_
     dxl_move_speed(STOP)
 
     # turn off gear_rec_bool and collect results
-    thread_current.join()
-    read_queue2 = output_queue.get()
+    # thread_current.join()
+    # read_queue2 = output_queue.get()
 
     # make sure esp and dxl values are sorted correctly
-    if len(read_queue2) == 2:
-        dxl_inputs = read_queue2
-        esp_inputs = read_queue1[:-1]
-    else:
-        dxl_inputs = read_queue1
-        esp_inputs = read_queue2[:-1]
+    # if len(read_queue2) == 2:
+    #     dxl_inputs = read_queue2
+    #     esp_inputs = read_queue1[:-1]
+    # else:
+    #     dxl_inputs = read_queue1
+    #     esp_inputs = read_queue2[:-1]
+    dxl_inputs = read_queue1
 
     # Change goal position
     if DIR == 0:
@@ -477,7 +478,8 @@ def Run_Experiment(in_dict, RUNTIME = 2, in_key = 'test', DIR = direction, file_
 
     portHandler.closePort()
 
-    all_inputs = [dxl_inputs,esp_inputs]
+    # all_inputs = [dxl_inputs,esp_inputs]
+    all_inputs = [dxl_inputs,np.zeros([len(dxl_inputs[0]),1]).astype(int)] # esp_inputs not used in this function, so just set to zeros
 
     # add to existing dictionary
     key_name = in_key
