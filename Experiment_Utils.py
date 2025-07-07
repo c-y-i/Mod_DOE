@@ -42,7 +42,7 @@ import threading                              # Import threading
 from queue import Queue                   # Import queue
 
 # ESP32 Pico D4 features
-esp_serial = '/dev/ttyUSB0' # CHECK - may be 0 or 1
+esp_serial = '/dev/ttyUSB1' # CHECK - may be 0 or 1
 # esp_baud = 115200
 esp_baud = 500_000 #ESP default baudrate : 115200
 
@@ -76,7 +76,7 @@ PROTOCOL_VERSION            = 2.0               # See which protocol version is 
 # Default setting
 DXL_ID                      = 35                # Dynamixel ID : 1
 BAUDRATE                    = 3_000_000           # Dynamixel default baudrate : 57600
-DEVICENAME                  = '/dev/ttyUSB1'    # Check which port is being used on your controller
+DEVICENAME                  = '/dev/ttyUSB0'    # Check which port is being used on your controller
                                                 # ex) Windows: "COM1"   Linux: "/dev/ttyUSB0" Mac: "/dev/tty.usbserial-*"
 
 TORQUE_ENABLE               = 1                 # Value for enabling the torque
