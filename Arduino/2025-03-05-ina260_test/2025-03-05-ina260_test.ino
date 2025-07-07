@@ -1,6 +1,7 @@
 #include <Adafruit_INA260.h>
 
 Adafruit_INA260 ina260 = Adafruit_INA260();
+long start_time = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -13,7 +14,7 @@ void setup() {
     Serial.println("Couldn't find INA260 chip");
     while (1);
   }
-  long start_time = millis();
+  start_time = millis();
   Serial.println("Found INA260 chip");
 }
 
