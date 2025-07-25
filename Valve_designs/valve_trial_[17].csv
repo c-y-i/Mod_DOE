@@ -1,0 +1,4 @@
+Design,material,cut_geometry,thickness,dome_height,cut_length
+15,DS20,X,0.2606123599019608,1.0,0.75
+16,E0030,slit,1.5,3.8,0.75
+17,DS10,slit,1.5,1.0,0.75
