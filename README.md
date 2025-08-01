@@ -53,16 +53,6 @@ ArXiV to be uploaded here when created.
 
 * valve_tag_d_params.csv: comma-seperated-value file containing design parameter values for valve designs generated via L16b Taguchi array. Design values provided are, in order: design number, material (Ecoflex/Dragonskin silicone), valve thickness [mm], valve dome height [mm], cut length for slit in silicone valve [mm], cut geometry, test result for crack pressure [kPa], test result for steady-state pressure difference [kPa].
 
-### **Arduino**:
-
-* 2025_05_20_SparkFun_kPa_Send_Median_Filter: Arduino IDE .ino file for ESP-32 driven pressure monitoring via MPRLS0025 sensor and data transmission via ESP-NOW.
-
-* 2025_05_21_p_receieve_x2_serial_commands: Arduino IDE .ino file for ESP-32 driven receiving of pressure data via ESP-NOW and transfer to Python code via serial communication.
-
-* 2025-03-05-ina260_test: Arduino IDE .ino file for ESP-32 driven current sensing via ina260 sensor with transfer to Python code via serial communication.
-
-* 2025-03-11_LoadCell_Record_N: Arduino IDE .ino file for ESP-32 driven loadcell sensing for friction estimation with transfer to Python code via serial communication.
-
 ### **BO_designs**: 
 
 * BO_d_params.csv: a comma-seperated-value file containing values relevant to CAD-work for gear designs generated via Bayesian Optimization. Wolfram gear design values provided are, in order: design number, number of teeth on sun gear, number of teeth on first part of planet gears, number of teeth on second part of planet gears, number of teeth on ring gear 2, profile shift coefficient for the sun gear, profile shift coefficient for the first part of planet gears, profile shift coefficient for the second part of planet gears, profile shift coefficient for ring gear 2, carrier radii [mm], gear thickness for all gears [mm]. 
