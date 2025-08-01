@@ -169,3 +169,8 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Local, scratch, and OLD folders
+OLD/
+local/
+Scratch/

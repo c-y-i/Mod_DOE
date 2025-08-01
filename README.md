@@ -1,5 +1,7 @@
 # Mod_DOE
-Design of experiments for Modlab design projects.
+This GitHub repository is presented as supplementary material to the paper Active Learning for Rapid Prototyping: Model Uncertainty in Design of Experiments, authored by Gregory M. Campbell, Yi Cao, Hannah Escritor, Zihao Zhou, and Mark Yim. 
+
+ArXiV to be uploaded here when created.
 
 ## **Description of the file structure**:
 
@@ -94,7 +96,6 @@ This folder contains tools, scripts, and data for Wolfrom gearbox design and opt
 ### TODO for other files/structure (remove what we can, explain the rest.)
 
 * gear_optimization_visualization.ipynb: design space visualization for choosing relevant gear parameter inputs to L32b taguchi array.
-
 ### **CAD Files**
 
 This folder contains printable parts and assemblies for the Wolfrom gearbox (Bayesian Optimization trial **BO22**) and the valve mold set (All-trials One-Shot).
