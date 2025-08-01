@@ -76,8 +76,48 @@ ArXiV to be uploaded here when created.
 * valve_trial_[X].csv: comma-seperated-value file containing design parameter values for valve designs generated via Bayesian Optimization during acquisition that yielded design number X. Design values provided are, in order: design number, material (Ecoflex/Dragonskin silicone), cut geometry, valve thickness [mm], valve dome height [mm], cut length for slit in silicone valve [mm].
 
 
-### **wolfrom**:
+### **wolfrom**
+
+This folder contains tools, scripts, and data for Wolfrom gearbox design and optimization.
+
+* **gear_maker** - Gear Generator add-in for Fusion 360  
+  - `gear_maker.py` - Source code for the add-in.  
+  - `gear_maker.manifest` - Add-in metadata file required for Fusion 360 to run the script.  
+
+* **config.json** - Parameter definitions and value ranges for gearbox generation.  
+
+* **design_params.py** - Alternative method for generating design parameters for the Taguchi Array.  
+
+* **cross_reference.py** - Post-processes results from `design_params.py` to create candidate designs for the Taguchi Array.  
+
+* **gear_optimization_visualization.ipynb** - Jupyter Notebook for visualizing the gear optimization design space.
+
 
 ### TODO for other files/structure (remove what we can, explain the rest.)
 
 * gear_optimization_visualization.ipynb: design space visualization for choosing relevant gear parameter inputs to L32b taguchi array.
+### **CAD Files**
+
+This folder contains printable parts and assemblies for the Wolfrom gearbox (Bayesian Optimization trial **BO22**) and the valve mold set (All-trials One-Shot).
+
+#### [`gear_BO22`](./CAD/gear_BO22) - Wolfrom gearbox (BO trial 22)
+Files here provide both individual STL parts for 3D printing and full assemblies for reference/CAD transfer.
+
+* **STL parts (ready to print)**
+  - `22_sun_12_0.7513_6.stl` - sun gear  
+  - `22_planet_36_0.7854_28_*.stl` - two-stage planet gear (first and second segments)  
+  - `22_ring2_76_0.1686_6.stl` - ring gear 2  
+  - `ring1_90_6.stl` - ring gear 1  
+  - `22_carrier2_20.7_6.stl` - planet carrier  
+
+  *Naming note:* Filenames encode trial and key parameters (e.g., tooth counts, profile shift, thickness in mm).
+
+* **Assemblies**
+  - `BO_22_Gearbox.f3d` - Fusion 360 design file for the BO22 assembly.
+  - `BO_22_Gearbox.step` - neutral STEP export of the same assembly for use outside Fusion.
+
+#### [`valve_ALL_OS`](./CAD/valve_ALL_OS) - Valve (All-trials One-Shot)
+Parametric solids for the “one-shot” valve mold halves:
+
+* `ALL_OS_f.SLDPRT` - **female** (cavity) half.  
+* `ALL_OS_m.SLDPRT` - **male** (protruding/core) half.
