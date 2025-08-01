@@ -92,8 +92,6 @@ This folder contains tools, scripts, and data for Wolfrom gearbox design and opt
 
 * **cross_reference.py** - Post-processes results from `design_params.py` to create candidate designs for the Taguchi Array.  
 
-* **gear_optimization_visualization.ipynb** - Jupyter Notebook for visualizing the gear optimization design space.
-
 * **gear_optimization_visualization.ipynb** - design space visualization for choosing relevant gear parameter inputs to L32b taguchi array.
   
 ### **CAD Files**
