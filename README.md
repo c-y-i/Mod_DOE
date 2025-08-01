@@ -13,6 +13,8 @@ ArXiV to be uploaded here when created.
 
 * wolfrom includes theoretical gear design files used for parameter selection.
 
+* CAD includes computer-aided design files for an example gear and valve mold
+
 ## Files and variables:
 
 ### **root**:
@@ -92,10 +94,8 @@ This folder contains tools, scripts, and data for Wolfrom gearbox design and opt
 
 * **gear_optimization_visualization.ipynb** - Jupyter Notebook for visualizing the gear optimization design space.
 
-
-### TODO for other files/structure (remove what we can, explain the rest.)
-
-* gear_optimization_visualization.ipynb: design space visualization for choosing relevant gear parameter inputs to L32b taguchi array.
+* **gear_optimization_visualization.ipynb** - design space visualization for choosing relevant gear parameter inputs to L32b taguchi array.
+  
 ### **CAD Files**
 
 This folder contains printable parts and assemblies for the Wolfrom gearbox (Bayesian Optimization trial **BO22**) and the valve mold set (All-trials One-Shot).
