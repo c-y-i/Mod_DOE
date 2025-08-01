@@ -94,7 +94,7 @@ This folder contains tools, scripts, and data for Wolfrom gearbox design and opt
 
 * **gear_optimization_visualization.ipynb** - design space visualization for choosing relevant gear parameter inputs to L32b taguchi array.
   
-### **CAD Files**
+### **CAD**
 
 This folder contains printable parts and assemblies for the Wolfrom gearbox (Bayesian Optimization trial **BO22**) and the valve mold set (All-trials One-Shot).
 
@@ -111,7 +111,7 @@ Files here provide both individual STL parts for 3D printing and full assemblies
   *Naming note:* Filenames encode trial and key parameters (e.g., tooth counts, profile shift, thickness in mm).
 
 * **Assemblies**
-  - `BO_22_Gearbox.f3d` - Fusion 360 design file for the BO22 assembly.
+  - `BO_22_Gearbox.f3d` - Fusion 360 design file for the BO22 assembly, bearing & shaft parts included.
   - `BO_22_Gearbox.step` - neutral STEP export of the same assembly for use outside Fusion.
 
 #### [`valve_ALL_OS`](./CAD/valve_ALL_OS) - Valve (All-trials One-Shot)
