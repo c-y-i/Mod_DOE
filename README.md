@@ -53,6 +53,9 @@ ArXiV to be uploaded here when created.
 
 * valve_tag_d_params.csv: comma-seperated-value file containing design parameter values for valve designs generated via L16b Taguchi array. Design values provided are, in order: design number, material (Ecoflex/Dragonskin silicone), valve thickness [mm], valve dome height [mm], cut length for slit in silicone valve [mm], cut geometry, test result for crack pressure [kPa], test result for steady-state pressure difference [kPa].
 
+* one_shots_d_params.csv: comma-seperated-value file containing design parameter values for valve designs generated via BO trained on 0: all Taguchi trials and 1: all Taguchi and BO trials. Design values provided are, in order: design number, material (Ecoflex/Dragonskin silicone), valve thickness [mm], valve dome height [mm], cut length for slit in silicone valve [mm], cut geometry, test result for crack pressure [kPa], test result for steady-state pressure difference [kPa].
+
+
 ### **BO_designs**: 
 
 * BO_d_params.csv: a comma-seperated-value file containing values relevant to CAD-work for gear designs generated via Bayesian Optimization. Wolfram gear design values provided are, in order: design number, number of teeth on sun gear, number of teeth on first part of planet gears, number of teeth on second part of planet gears, number of teeth on ring gear 2, profile shift coefficient for the sun gear, profile shift coefficient for the first part of planet gears, profile shift coefficient for the second part of planet gears, profile shift coefficient for ring gear 2, carrier radii [mm], gear thickness for all gears [mm]. 
