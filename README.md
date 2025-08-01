@@ -1,5 +1,7 @@
 # Mod_DOE
-Design of experiments for Modlab design projects.
+This GitHub repository is presented as supplementary material to the paper Active Learning for Rapid Prototyping: Model Uncertainty in Design of Experiments, authored by Gregory M. Campbell, Yi Cao, Hannah Escritor, Zihao Zhou, and Mark Yim. 
+
+ArXiV to be uploaded here when created.
 
 ## **Description of the file structure**:
 
