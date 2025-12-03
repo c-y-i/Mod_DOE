@@ -1,5 +1,5 @@
 # Mod_DOE
-This GitHub repository is presented as supplementary material to the paper Active Learning for Rapid Prototyping: Model Uncertainty in Design of Experiments, authored by Gregory M. Campbell, Yi Cao, Hannah Escritor, Zihao Zhou, and Mark Yim. 
+This GitHub repository is presented as supplementary material to the paper *Co-Optimization of Design and Manufacturing Parameters for Low-Cost Robotic Actuation*, authored by Gregory M. Campbell, Yi Cao, Hannah Escritor, Zihao Zhou, and Mark Yim. 
 
 ArXiV to be uploaded here when created.
 
